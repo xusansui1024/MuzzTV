@@ -17,7 +17,7 @@ export default async function handler(req, res) {
     // 3. 請求目標圖片，並清空 Referer 以繞過防盜鏈（如豆瓣圖片）
     const response = await fetch(url, {
       headers: {
-        'Referer': '', // 核心：清空防盜鏈
+        'Referer': 'https://www.douban.com', // 偽裝成豆瓣官網來源
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
       }
     });
