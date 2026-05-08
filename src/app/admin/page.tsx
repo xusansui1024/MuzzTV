@@ -4755,7 +4755,7 @@ function AdminPageClient() {
                 isExpanded={expandedTabs.dataMigration}
                 onToggle={() => toggleTab('dataMigration')}
               >
-                <DataMigration onRefreshConfig={fetchConfig} />
+  
               </CollapsibleTab>
             )}
           </div>
