@@ -85,5 +85,9 @@
       "api": "https://zy.xmm.hk/api.php/provide/vod",
       "name": "小猫咪资源"
     }
+  },
+  "SiteConfig": {
+    "DoubanProxy": "https://www.xiaoxu.online/api/proxy?url=",
+    "ImageProxy": "https://www.xiaoxu.online/api/proxy?url="
   }
 }
