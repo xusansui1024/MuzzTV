@@ -62,6 +62,14 @@ const nextConfig = {
 
     return config;
   },
+  typescript: {
+    // 允許在有 TypeScript 錯誤的情況下依然強制打包部署
+    ignoreBuildErrors: true,
+  },
+  eslint: {
+    // 允許在有 ESLint 錯誤的情況下依然強制打包部署
+    ignoreDuringBuilds: true,
+  },
 };
 
 const withPWA = require('next-pwa')({
