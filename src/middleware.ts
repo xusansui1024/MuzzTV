@@ -7,6 +7,10 @@ import { getAuthInfoFromCookie } from '@/lib/auth';
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // 💡 新增这两行：获取并打印访客的真实 IP
+  const ip = request.headers.get('x-forwarded-for') || request.ip || '未知 IP';
+  console.log(`[实时监控] 路径: ${pathname} | 访客 IP: ${ip}`);
+  
   // 💡 新增这行：如果是图片/数据代理接口，直接放行，不进行身份验证
   if (pathname.startsWith('/api/proxy')) {
     return NextResponse.next();
