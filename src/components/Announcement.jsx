@@ -34,7 +34,7 @@ export default function Announcement() {
         {/* 1. 标题区域：带原版那根灵魂的绿色短横线 */}
         <div style={{ marginBottom: '20px' }}>
           <h2 style={{ fontSize: '20px', fontWeight: 'bold', color: '#1f2937', margin: 0 }}>
-            影院公告
+            小徐影院公告
           </h2>
           <div style={{ height: '2px', width: '32px', backgroundColor: '#1da055', marginTop: '8px' }}></div>
         </div>
@@ -49,7 +49,7 @@ export default function Announcement() {
           marginBottom: '24px'
         }}>
           <p style={{ margin: 0, color: '#4b5563', fontSize: '15px', lineHeight: '1.6' }}>
-            如影片封面没有正常加载，请尝试点击右上角用户头像 - 设置，并点击“重置”！！！
+            如影片封面没有正常加载，请尝试点击右上角用户头像 - 设置，并点击“重置”!!!!!!
           </p>
         </div>
 
