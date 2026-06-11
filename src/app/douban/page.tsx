@@ -75,9 +75,9 @@ function DoubanPageClient() {
 
       let list: DoubanItem[] = [];
 
-      // 自动逻辑：泰剧使用搜索 API，其他走原逻辑
+      // 优化点：将关键词从“泰国电视剧”改为更通用的“泰剧”，提高匹配率
       if (secondarySelection === 'tv_Thailand') {
-        const res = await fetch(`/api/search?q=${encodeURIComponent('泰国电视剧')}`);
+        const res = await fetch(`/api/search?q=${encodeURIComponent('泰剧')}`);
         const json = await res.json();
         list = (json.results || []).map((item: any) => ({
             id: item.id || '',
