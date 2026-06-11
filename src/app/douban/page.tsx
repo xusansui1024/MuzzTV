@@ -5,12 +5,22 @@ import { useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 
 import { getDoubanCategories, getDoubanList } from '@/lib/douban.client';
-import { DoubanItem, DoubanResult } from '@/lib/types';
+import { DoubanItem } from '@/lib/types';
 
 import DoubanCardSkeleton from '@/components/DoubanCardSkeleton';
 import DoubanSelector from '@/components/DoubanSelector';
 import PageLayout from '@/components/PageLayout';
 import VideoCard from '@/components/VideoCard';
+
+// 【新增】：标题标准化函数，去除括号、后缀等干扰
+const normalizeTitle = (title: string) => {
+  return title
+    .replace(/[\(\（].*?[\)\）]/g, '') // 去除括号内容
+    .replace(/[\[\【].*?[\]\】]/g, '') // 去除中括号内容
+    .replace(/[:：-].*$/, '')          // 去除冒号/连字符后的内容
+    .trim()
+    .toLowerCase();
+};
 
 function DoubanPageClient() {
   const searchParams = useSearchParams();
@@ -67,7 +77,6 @@ function DoubanPageClient() {
     pageStart,
   }), [type, primarySelection, secondarySelection]);
 
-  // 智能数据获取函数
   const fetchData = useCallback(async (pageStart: number, isMore: boolean) => {
     try {
       if (isMore) setIsLoadingMore(true);
@@ -76,7 +85,7 @@ function DoubanPageClient() {
       let list: DoubanItem[] = [];
 
       if (secondarySelection === 'tv_Thailand') {
-        const keywords = ['泰剧', '泰国', 'Thai', '禁忌女孩', '天生一对', '深宅绅士'];
+        const keywords = ['泰剧', '泰国', 'Thai', '禁忌女孩', '天生一对'];
         const pg = Math.floor(pageStart / 25) + 1;
         
         const results = await Promise.all(
@@ -87,20 +96,19 @@ function DoubanPageClient() {
         
         const blacklist = ['AFC', '锦标赛', '足球', '比赛', '亚足联', '预选赛', '世界杯', 'Logo', '积分榜', '女足', 'NBA', '亚洲杯', '泰国性痴迷', '亚运会', '男足', '回放', '世预赛', '世预亚','狂野泰国','冲游泰国','到了30岁还是处男','男足', '亚残运会', '泰国大象医院', '冲遊泰国', '野性泰国','T台新面孔', '泰国72小时粤语', '觉醒眼神后', '幸存者', '空中看泰国', '南洋大宝荐'];
         
-        // 临时 Map 用于处理本次抓取的数据
         const newItemsMap = new Map<string, DoubanItem>();
         
         allResults.forEach((item: any) => {
-            const title = item.title || item.name || '';
-            const id = item.id || title; // 优先使用ID作为唯一标识
-            const isNoise = blacklist.some(kw => title.includes(kw));
+            const rawTitle = item.title || item.name || '';
+            const normalized = normalizeTitle(rawTitle); // 使用归一化后的标题去重
+            const isNoise = blacklist.some(kw => rawTitle.includes(kw));
             
-            if (!isNoise && title.length > 0) {
-                // 使用 ID 去重
-                if (!newItemsMap.has(id)) {
-                    newItemsMap.set(id, {
+            if (!isNoise && normalized.length > 0) {
+                // 只有在归一化标题不存在时才添加
+                if (!newItemsMap.has(normalized)) {
+                    newItemsMap.set(normalized, {
                         id: item.id || '',
-                        title: title,
+                        title: rawTitle, // 界面显示原始标题
                         poster: item.poster || item.cover || item.pic || '',
                         rate: item.rate || '0.0',
                         year: item.year || '0'
@@ -110,28 +118,25 @@ function DoubanPageClient() {
         });
         
         list = Array.from(newItemsMap.values());
-
-        // 前端年份降序排序
         list.sort((a, b) => parseInt(b.year || '0') - parseInt(a.year || '0'));
         setHasMore(list.length > 0);
       } 
       else if (custom) {
         const data = await getDoubanList({ tag, type, pageLimit: 25, pageStart });
         if (data.code === 200) list = data.list;
-        setHasMore(list.length === 25);
+        setHasMore(list.length > 0);
       } else {
         const data = await getDoubanCategories(getRequestParams(pageStart));
         if (data.code === 200) list = data.list;
-        setHasMore(list.length === 25);
+        setHasMore(list.length > 0);
       }
 
-      // 【双重去重】：不仅在本次抓取中去重，更新状态时再次使用 ID 过滤
       setDoubanData(prev => {
           const combined = isMore ? [...prev, ...list] : list;
-          // 利用 Map 的特性，以 ID 为 Key 再次去重
-          const uniqueCombined = new Map();
-          combined.forEach(item => uniqueCombined.set(item.id || item.title, item));
-          return Array.from(uniqueCombined.values());
+          // 全局去重（防止不同页之间重复）
+          const finalMap = new Map();
+          combined.forEach(item => finalMap.set(normalizeTitle(item.title), item));
+          return Array.from(finalMap.values());
       });
       
     } catch (err) {
