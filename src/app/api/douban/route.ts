@@ -51,17 +51,18 @@ export async function GET(request: Request) {
 
   if (tag === 'top250') return handleTop250(pageStart);
 
-  // --- 核心逻辑修改：优先使用关键词搜索 (q) ---
-  let target = '';
-  if (type === 'tv' && tag === '泰国') {
-    // 对于泰剧，直接使用关键词“泰国电视剧”搜索，这比 tag 筛选准确得多
-    target = `https://movie.douban.com/j/search_subjects?type=tv&tag=&q=${encodeURIComponent('泰国电视剧')}&sort=recommend&page_limit=${pageSize}&page_start=${pageStart}`;
-  } else {
-    // 其他情况保持原有的标签筛选
-    const finalTag = tag === '泰国' ? '泰剧' : tag;
-    target = `https://movie.douban.com/j/search_subjects?type=${type}&tag=${encodeURIComponent(finalTag)}&sort=recommend&page_limit=${pageSize}&page_start=${pageStart}`;
+  // --- 修正后的标签映射 ---
+  // 这里只使用 tag 参数，因为 search_subjects 接口只支持 tag
+  let finalTag = tag;
+  if (type === 'tv') {
+     if (tag === '泰国') finalTag = '泰剧';
+     else if (tag === '美国') finalTag = '美剧';
+     else if (tag === '日本') finalTag = '日剧';
   }
-  // ------------------------------------------
+  
+  // 必须使用 encodeURIComponent 确保中文标签被正确识别
+  const target = `https://movie.douban.com/j/search_subjects?type=${type}&tag=${encodeURIComponent(finalTag)}&sort=recommend&page_limit=${pageSize}&page_start=${pageStart}`;
+  // -----------------------
 
   try {
     const doubanData = await fetchDoubanData(target);
