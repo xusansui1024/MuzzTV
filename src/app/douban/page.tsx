@@ -67,7 +67,7 @@ function DoubanPageClient() {
     pageStart,
   }), [type, primarySelection, secondarySelection]);
 
-  // 核心：智能数据获取函数
+  // 智能数据获取函数（已加入关键词白名单过滤与去重）
   const fetchData = useCallback(async (pageStart: number, isMore: boolean) => {
     try {
       if (isMore) setIsLoadingMore(true);
@@ -75,17 +75,33 @@ function DoubanPageClient() {
 
       let list: DoubanItem[] = [];
 
-      // 优化点：将关键词从“泰国电视剧”改为更通用的“泰剧”，提高匹配率
       if (secondarySelection === 'tv_Thailand') {
         const res = await fetch(`/api/search?q=${encodeURIComponent('泰剧')}`);
         const json = await res.json();
-        list = (json.results || []).map((item: any) => ({
-            id: item.id || '',
-            title: item.title || item.name || '未知标题',
-            poster: item.poster || item.cover || item.pic || '',
-            rate: item.rate || '0.0',
-            year: item.year || ''
-        }));
+        
+        // 关键词白名单：只要包含这些词，就视为泰剧
+        const thaiKeywords = ['泰', '泰国', '泰剧', '泰版', '泰语', '泰国版'];
+        const uniqueMap = new Map<string, DoubanItem>();
+        
+        (json.results || []).forEach((item: any) => {
+            const title = item.title || item.name || '';
+            // 检查标题是否匹配白名单
+            const isThai = thaiKeywords.some(keyword => title.includes(keyword));
+            
+            if (isThai) {
+                // 使用 title 去重，保证列表整洁
+                if (!uniqueMap.has(title)) {
+                    uniqueMap.set(title, {
+                        id: item.id || '',
+                        title: title,
+                        poster: item.poster || item.cover || item.pic || '',
+                        rate: item.rate || '0.0',
+                        year: item.year || ''
+                    });
+                }
+            }
+        });
+        list = Array.from(uniqueMap.values());
       } 
       else if (custom) {
         const data = await getDoubanList({ tag, type, pageLimit: 25, pageStart });
