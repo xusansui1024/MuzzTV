@@ -76,8 +76,8 @@ function DoubanPageClient() {
       let list: DoubanItem[] = [];
 
       if (secondarySelection === 'tv_Thailand') {
-        const keywords = ['泰剧', '泰国', 'Thai'];
-        // 计算当前页码 (每页 25 条)
+        // 1. 扩充关键词，植入热门剧名作为搜索种子，提升召回权重
+        const keywords = ['泰剧', '泰国', 'Thai', '禁忌女孩', '泰剧 2026', '泰剧 2025'];
         const pg = Math.floor(pageStart / 25) + 1;
         
         const results = await Promise.all(
@@ -86,7 +86,6 @@ function DoubanPageClient() {
         
         const allResults = results.flatMap(r => r.results || r.list || []);
         
-        // 黑名单：剔除干扰项
         const blacklist = ['AFC', '锦标赛', '足球', '比赛', '亚足联', '预选赛', '世界杯', 'Logo', '积分榜', '女足', 'NBA', '亚洲杯', '泰国性痴迷', '亚运会', '男足', '回放', '世预赛', '世预亚','狂野泰国','冲游泰国','到了30岁还是处男','男足', '亚残运会', '泰国大象医院', '冲遊泰国', '野性泰国','T台新面孔', '泰国72小时粤语', '觉醒眼神后', '幸存者', '空中看泰国', '南洋大宝荐'];
         
         const uniqueMap = new Map<string, DoubanItem>();
@@ -95,7 +94,6 @@ function DoubanPageClient() {
             const title = item.title || item.name || '';
             const isNoise = blacklist.some(kw => title.includes(kw));
             
-            // 只要不是黑名单的，全部收录（移除 isThai 检测，不再强制标题含“泰”）
             if (!isNoise && title.length > 0) {
                 if (!uniqueMap.has(title)) {
                     uniqueMap.set(title, {
@@ -103,14 +101,22 @@ function DoubanPageClient() {
                         title: title,
                         poster: item.poster || item.cover || item.pic || '',
                         rate: item.rate || '0.0',
-                        year: item.year || ''
+                        year: item.year || '0'
                     });
                 }
             }
         });
         
         list = Array.from(uniqueMap.values());
-        setHasMore(list.length >= 25); // 如果返回了25条，说明可能还有更多
+
+        // 2. 治本：前端强制年份重排序 (降序：年份大的排前面)
+        list.sort((a, b) => {
+            const yearA = parseInt(a.year || '0');
+            const yearB = parseInt(b.year || '0');
+            return yearB - yearA; 
+        });
+
+        setHasMore(list.length >= 25);
       } 
       else if (custom) {
         const data = await getDoubanList({ tag, type, pageLimit: 25, pageStart });
