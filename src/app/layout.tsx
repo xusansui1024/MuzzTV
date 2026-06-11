@@ -14,7 +14,7 @@ import { ThemeProvider } from '../components/ThemeProvider';
 
 const inter = Inter({ subsets: ['latin'] });
 
-// 动态生成 metadata，支持配置更新后的标题变化
+// 动态生成 metadata
 export async function generateMetadata(): Promise<Metadata> {
   let siteName = process.env.SITE_NAME || '蜡笔小徐';
   if (
@@ -24,6 +24,9 @@ export async function generateMetadata(): Promise<Metadata> {
     const config = await getConfig();
     siteName = config.SiteConfig.SiteName;
   }
+  
+  // --- 强制覆盖逻辑 ---
+  siteName = '蜡笔小徐';
 
   return {
     title: siteName,
@@ -43,9 +46,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   let siteName = process.env.SITE_NAME || '蜡笔小徐';
-  let announcement =
-    process.env.ANNOUNCEMENT ||
-    '';
+  let announcement = process.env.ANNOUNCEMENT || '';
   let enableRegister = process.env.NEXT_PUBLIC_ENABLE_REGISTER === 'true';
   let imageProxy = process.env.NEXT_PUBLIC_IMAGE_PROXY || '';
   let doubanProxy = process.env.NEXT_PUBLIC_DOUBAN_PROXY || '';
@@ -55,6 +56,7 @@ export default async function RootLayout({
       type: category.type,
       query: category.query,
     })) || ([] as Array<{ name: string; type: 'movie' | 'tv'; query: string }>);
+
   if (
     process.env.NEXT_PUBLIC_STORAGE_TYPE !== 'd1' &&
     process.env.NEXT_PUBLIC_STORAGE_TYPE !== 'upstash'
@@ -74,7 +76,10 @@ export default async function RootLayout({
     }));
   }
 
-  // 将运行时配置注入到全局 window 对象，供客户端在运行时读取
+  // --- 强制覆盖逻辑 ---
+  siteName = '蜡笔小徐';
+
+  // 将运行时配置注入到全局 window 对象
   const runtimeConfig = {
     STORAGE_TYPE: process.env.NEXT_PUBLIC_STORAGE_TYPE || 'localstorage',
     ENABLE_REGISTER: enableRegister,
@@ -90,8 +95,6 @@ export default async function RootLayout({
           name='viewport'
           content='width=device-width, initial-scale=1.0, viewport-fit=cover'
         />
-        {/* 将配置序列化后直接写入脚本，浏览器端可通过 window.RUNTIME_CONFIG 获取 */}
-        {/* eslint-disable-next-line @next/next/no-sync-scripts */}
         <script
           dangerouslySetInnerHTML={{
             __html: `window.RUNTIME_CONFIG = ${JSON.stringify(runtimeConfig)};`,
