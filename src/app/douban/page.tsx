@@ -67,7 +67,7 @@ function DoubanPageClient() {
     pageStart,
   }), [type, primarySelection, secondarySelection]);
 
-  // 智能数据获取函数（多关键词聚合版）
+  // 智能数据获取函数（加入了黑名单过滤，剔除体育赛事等杂质）
   const fetchData = useCallback(async (pageStart: number, isMore: boolean) => {
     try {
       if (isMore) setIsLoadingMore(true);
@@ -76,7 +76,6 @@ function DoubanPageClient() {
       let list: DoubanItem[] = [];
 
       if (secondarySelection === 'tv_Thailand') {
-        // 同时发起多个关键词搜索，跳过 page 参数
         const keywords = ['泰剧', '泰国', '泰版'];
         const results = await Promise.all(
             keywords.map(kw => fetch(`/api/search?q=${encodeURIComponent(kw)}`).then(r => r.json()))
@@ -84,14 +83,20 @@ function DoubanPageClient() {
         
         const allResults = results.flatMap(r => r.results || []);
         
+        // 关键词白名单
         const thaiKeywords = ['泰', '泰国', '泰剧', '泰版', '泰语', '泰国版'];
+        // 黑名单：剔除掉非影视类的干扰信息
+        const blacklist = ['AFC', '锦标赛', '足球', '比赛', '亚足联', '预选赛', '世界杯', 'Logo', '积分榜', '女足', 'NBA', '亚洲杯', '泰国性痴迷', '亚运会', '男足'];
+        
         const uniqueMap = new Map<string, DoubanItem>();
         
         allResults.forEach((item: any) => {
             const title = item.title || item.name || '';
             const isThai = thaiKeywords.some(keyword => title.includes(keyword));
+            const isNoise = blacklist.some(kw => title.includes(kw));
             
-            if (isThai) {
+            // 只有属于泰剧 且 不属于黑名单的，才会被加入
+            if (isThai && !isNoise) {
                 if (!uniqueMap.has(title)) {
                     uniqueMap.set(title, {
                         id: item.id || '',
@@ -114,7 +119,6 @@ function DoubanPageClient() {
       }
 
       setDoubanData(prev => isMore ? [...prev, ...list] : list);
-      // 聚合模式下不分页，所以设为 false
       setHasMore(false); 
     } catch (err) {
       console.error("加载数据出错:", err);
