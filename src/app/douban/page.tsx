@@ -103,7 +103,7 @@ function DoubanPageClient() {
       setLoading(true);
       let data: DoubanResult;
 
-      // 修正后的逻辑：优先判断泰剧，再判断 custom，最后走默认
+      // 逻辑清晰：泰剧优先，其次 Custom，最后默认
       if (secondarySelection === 'tv_Thailand') {
         data = await getDoubanList({
           tag: '泰剧',
@@ -159,7 +159,7 @@ function DoubanPageClient() {
           setIsLoadingMore(true);
           let data: DoubanResult;
 
-          // 修正后的翻页逻辑
+          // 逻辑清晰：泰剧优先，其次 Custom，最后默认
           if (secondarySelection === 'tv_Thailand') {
             data = await getDoubanList({
               tag: '泰剧',
@@ -316,4 +316,14 @@ function DoubanPageClient() {
           )}
         </div>
       </div>
-    </PageLayout
+    </PageLayout>
+  );
+}
+
+export default function DoubanPage() {
+  return (
+    <Suspense>
+      <DoubanPageClient />
+    </Suspense>
+  );
+}
