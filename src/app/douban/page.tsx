@@ -83,7 +83,12 @@ function DoubanPageClient() {
 
       if (secondarySelection === 'tv_Thailand') {
         // 核心：移除硬编码关键词，只保留大范围搜索，避免搜索结果重叠
-        const keywords = ['泰剧', '泰国', 'Thai', '泰国剧'];
+        const keywords = ['泰国剧'','泰剧', '泰国', 'Thai', 
+            '禁忌女孩', '天生一对', 
+            '以你的心诠释我的爱', '特长生', 
+            '黑帮少爷爱上我', '学姐可以当老师', 
+            '只是朋友', '只因我们天生一对', 
+            '绝庙骗局', 'Shine', 'Mad Unicorn'];
         const pg = Math.floor(pageStart / 25) + 1;
         
         const results = await Promise.all(
