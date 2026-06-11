@@ -12,14 +12,23 @@ import DoubanSelector from '@/components/DoubanSelector';
 import PageLayout from '@/components/PageLayout';
 import VideoCard from '@/components/VideoCard';
 
-// 标题标准化：统一转小写，去除非核心词，用作去重指纹
+// 扩展 Item 类型以支持分组功能
+type DisplayItem = DoubanItem & { isGroup?: boolean; groupItems?: DoubanItem[] };
+
+// 用于去重
 const getUniqueKey = (item: any) => {
   return item.id ? item.id : `${(item.title || item.name || '').trim()}_${item.year || '0'}`;
 };
 
+// 用于分组 (仅比对标题)
+const getGroupKey = (item: any) => {
+  return (item.title || item.name || '').toLowerCase().trim();
+};
+
 function DoubanPageClient() {
   const searchParams = useSearchParams();
-  const [doubanData, setDoubanData] = useState<DoubanItem[]>([]);
+  const [doubanData, setDoubanData] = useState<DisplayItem[]>([]);
+  const [selectedGroup, setSelectedGroup] = useState<DisplayItem | null>(null);
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
@@ -35,31 +44,11 @@ function DoubanPageClient() {
   const name = searchParams.get('name') || '';
 
   const [primarySelection, setPrimarySelection] = useState<string>(() => type === 'movie' ? '热门' : '');
-  const [secondarySelection, setSecondarySelection] = useState<string>(() => {
-    if (type === 'movie') return '全部';
-    if (type === 'tv') return 'tv';
-    if (type === 'show') return 'show';
-    return '全部';
-  });
+  const [secondarySelection, setSecondarySelection] = useState<string>('全部');
 
   useEffect(() => {
     setSelectorsReady(false);
     setLoading(true);
-
-    if (type === 'movie') {
-      setPrimarySelection('热门');
-      setSecondarySelection('全部');
-    } else if (type === 'tv') {
-      setPrimarySelection('');
-      setSecondarySelection('tv');
-    } else if (type === 'show') {
-      setPrimarySelection('');
-      setSecondarySelection('show');
-    } else {
-      setPrimarySelection('');
-      setSecondarySelection('全部');
-    }
-
     const timer = setTimeout(() => setSelectorsReady(true), 50);
     return () => clearTimeout(timer);
   }, [type, tag, custom]);
@@ -77,10 +66,9 @@ function DoubanPageClient() {
       if (isMore) setIsLoadingMore(true);
       else setLoading(true);
 
-      let list: DoubanItem[] = [];
+      let rawList: DoubanItem[] = [];
 
       if (secondarySelection === 'tv_Thailand') {
-        // 修复：修正了之前的语法错误，包含了所有热门剧名种子
         const keywords = [
             '泰剧', '泰国', 'Thai', 
             '禁忌女孩', '天生一对', 
@@ -90,116 +78,76 @@ function DoubanPageClient() {
             '绝庙骗局', 'Shine', 'Mad Unicorn'
         ];
         const pg = Math.floor(pageStart / 25) + 1;
-        
-        const results = await Promise.all(
-            keywords.map(kw => fetch(`/api/search?q=${encodeURIComponent(kw)}&pg=${pg}`).then(r => r.json()))
-        );
-        
-        const allResults = results.flatMap(r => r.results || r.list || []);
-        
-        const blacklist = ['AFC', '锦标赛', '足球', '比赛', '亚足联', '预选赛', '世界杯', 'Logo', '积分榜', '女足', 'NBA', '亚洲杯', '泰国性痴迷', '亚运会', '男足', '回放', '世预赛', '世预亚','狂野泰国','冲游泰国','到了30岁还是处男','男足', '亚残运会', '泰国大象医院', '冲遊泰国', '野性泰国','T台新面孔', '泰国72小时粤语', '觉醒眼神后', '幸存者', '空中看泰国', '南洋大宝荐', '短剧', '爽文', '微剧'];
-        
-        const uniqueMap = new Map<string, DoubanItem>();
-        
-        allResults.forEach((item: any) => {
-            const rawTitle = item.title || item.name || '';
-            const isNoise = blacklist.some(kw => rawTitle.includes(kw));
-            
-            if (!isNoise && rawTitle.length > 0) {
-                const uniqueKey = getUniqueKey(item); 
-                if (!uniqueMap.has(uniqueKey)) {
-                    uniqueMap.set(uniqueKey, {
-                        id: item.id || '',
-                        title: rawTitle,
-                        poster: item.poster || item.cover || item.pic || '',
-                        rate: item.rate || '0.0',
-                        year: item.year || '0'
-                    });
-                }
-            }
-        });
-        
-        list = Array.from(uniqueMap.values());
-        list.sort((a, b) => parseInt(b.year || '0') - parseInt(a.year || '0'));
-        setHasMore(list.length > 0);
-      } 
-      else if (custom) {
+        const results = await Promise.all(keywords.map(kw => fetch(`/api/search?q=${encodeURIComponent(kw)}&pg=${pg}`).then(r => r.json())));
+        rawList = results.flatMap(r => r.results || r.list || []);
+      } else if (custom) {
         const data = await getDoubanList({ tag, type, pageLimit: 25, pageStart });
-        if (data.code === 200) list = data.list;
-        setHasMore(list.length > 0);
+        rawList = data.code === 200 ? data.list : [];
       } else {
-        const data = await getDoubanCategories(getRequestParams(pageStart));
-        if (data.code === 200) list = data.list;
-        setHasMore(list.length > 0);
+        const data = await getDoubanCategories({ kind: (type === 'tv' || type === 'show') ? 'tv' : 'movie', category: type, type: secondarySelection, pageLimit: 25, pageStart });
+        rawList = data.code === 200 ? data.list : [];
       }
 
-      setDoubanData(prev => {
-          const combined = isMore ? [...prev, ...list] : list;
-          const finalMap = new Map();
-          combined.forEach(item => finalMap.set(getUniqueKey(item), item));
-          return Array.from(finalMap.values()).sort((a, b) => parseInt(b.year || '0') - parseInt(a.year || '0'));
+      const blacklist = ['AFC', '锦标赛', '足球', '比赛', '亚足联', '预选赛', '世界杯', 'Logo', '积分榜', '女足', 'NBA', '亚洲杯', '泰国性痴迷', '亚运会', '男足', '回放', '世预赛', '世预亚','狂野泰国','冲游泰国','到了30岁还是处男','男足', '亚残运会', '泰国大象医院', '冲遊泰国', '野性泰国','T台新面孔', '泰国72小时粤语', '觉醒眼神后', '幸存者', '空中看泰国', '南洋大宝荐', '短剧', '爽文', '微剧'];
+      const filteredList = rawList.filter(item => !blacklist.some(kw => (item.title || '').includes(kw)));
+
+      // 分组逻辑：按标题分组
+      const groupMap = new Map<string, DoubanItem[]>();
+      filteredList.forEach(item => {
+        const key = getGroupKey(item);
+        if (!groupMap.has(key)) groupMap.set(key, []);
+        groupMap.get(key)!.push(item);
       });
-      
+
+      const processedList: DisplayItem[] = Array.from(groupMap.values()).map(items => {
+        if (items.length > 1) return { ...items[0], isGroup: true, groupItems: items };
+        return items[0];
+      });
+
+      setDoubanData(prev => isMore ? [...prev, ...processedList] : processedList);
+      setHasMore(rawList.length > 0);
     } catch (err) {
-      console.error("加载数据出错:", err);
+      console.error(err);
       setHasMore(false);
     } finally {
-      if (isMore) setIsLoadingMore(false);
-      else setLoading(false);
+      setIsLoadingMore(false);
+      setLoading(false);
     }
-  }, [type, tag, custom, secondarySelection, getRequestParams]);
+  }, [type, secondarySelection, tag, custom, getRequestParams]);
 
   useEffect(() => {
     if (!selectorsReady && !custom) return;
-    if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current);
-    debounceTimeoutRef.current = setTimeout(() => {
-      setCurrentPage(0);
-      fetchData(0, false);
-    }, 100);
-    return () => { if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current); };
+    fetchData(0, false);
   }, [selectorsReady, type, tag, custom, primarySelection, secondarySelection, fetchData]);
-
-  useEffect(() => {
-    if (currentPage > 0) fetchData(currentPage * 25, true);
-  }, [currentPage]);
-
-  useEffect(() => {
-    if (!hasMore || isLoadingMore || loading || !loadingRef.current) return;
-    const observer = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) setCurrentPage(p => p + 1);
-    }, { threshold: 0.1 });
-    observer.observe(loadingRef.current);
-    return () => observer.disconnect();
-  }, [hasMore, isLoadingMore, loading]);
 
   return (
     <PageLayout activePath={`/douban?type=${type}&tag=${tag}`}>
       <div className='px-4 sm:px-10 py-4 sm:py-8'>
-        <div className='mb-6 sm:mb-8 space-y-4'>
-          <h1 className='text-2xl sm:text-3xl font-bold'>{name || (custom ? tag : (type === 'movie' ? '电影' : type === 'tv' ? '电视剧' : '综艺'))}</h1>
-          {!custom && (
-            <div className='bg-white/60 rounded-2xl p-4 border border-gray-200/30 backdrop-blur-sm'>
-              <DoubanSelector
-                type={type as 'movie' | 'tv' | 'show'}
-                primarySelection={primarySelection}
-                secondarySelection={secondarySelection}
-                onPrimaryChange={(v) => { if(v !== primarySelection) setPrimarySelection(v); }}
-                onSecondaryChange={(v) => { if(v !== secondarySelection) setSecondarySelection(v); }}
-              />
+        <div className='grid grid-cols-3 gap-x-4 gap-y-12 sm:grid-cols-[repeat(auto-fit,minmax(160px,1fr))]'>
+          {doubanData.map((item, i) => (
+            <div key={`${item.id}-${i}`} onClick={() => item.isGroup && setSelectedGroup(item)} className="cursor-pointer relative">
+               <VideoCard from='douban' title={item.title} poster={item.poster} douban_id={item.id} rate={item.rate} year={item.year} type={type === 'movie' ? 'movie' : ''} />
+               {item.isGroup && (
+                 <div className="absolute top-2 right-2 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded shadow-sm">
+                   {item.groupItems?.length}版本
+                 </div>
+               )}
             </div>
-          )}
-        </div>
-        
-        <div className='grid grid-cols-3 gap-x-2 gap-y-12 sm:grid-cols-[repeat(auto-fit,minmax(160px,1fr))] sm:gap-x-8 sm:gap-y-20'>
-          {(loading) ? Array.from({ length: 10 }, (_, i) => <DoubanCardSkeleton key={i} />)
-            : doubanData.map((item, i) => (
-                <VideoCard key={`${item.id}-${i}`} from='douban' title={item.title} poster={item.poster} douban_id={item.id} rate={item.rate} year={item.year} type={type === 'movie' ? 'movie' : ''} />
-              ))
-          }
+          ))}
         </div>
 
-        {hasMore && !loading && <div ref={loadingRef} className='h-20' />}
-        {!loading && doubanData.length === 0 && <div className='text-center py-20'>暂无相关内容</div>}
+        {selectedGroup && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setSelectedGroup(null)}>
+            <div className="bg-white rounded-xl p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+              <h2 className="text-xl font-bold mb-4">{selectedGroup.title} 的所有版本</h2>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                {selectedGroup.groupItems?.map((child, idx) => (
+                  <VideoCard key={idx} from='douban' title={child.title} poster={child.poster} douban_id={child.id} rate={child.rate} year={child.year} type={type === 'movie' ? 'movie' : ''} />
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </PageLayout>
   );
