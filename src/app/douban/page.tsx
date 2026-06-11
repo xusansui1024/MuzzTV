@@ -117,6 +117,14 @@ function DoubanPageClient() {
     try {
       setLoading(true);
       let data: DoubanResult;
+      if (secondarySelection === 'tv_Thailand') {
+      data = await getDoubanList({
+        tag: '泰剧', // 這裡用標籤來搜索，後端通常支援這個
+        type: 'tv',
+        pageLimit: 25,
+        pageStart: 0,
+      });
+    } else if (custom) {
       if (custom) {
         data = await getDoubanList({
           tag,
@@ -194,6 +202,14 @@ function DoubanPageClient() {
           setIsLoadingMore(true);
 
           let data: DoubanResult;
+          if (secondarySelection === 'tv_Thailand') {
+      data = await getDoubanList({
+        tag: '泰剧',
+        type: 'tv',
+        pageLimit: 25,
+        pageStart: currentPage * 25,
+      });
+    } else if (custom) {
           if (custom) {
             data = await getDoubanList({
               tag,
