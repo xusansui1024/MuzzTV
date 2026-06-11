@@ -14,9 +14,7 @@ import VideoCard from '@/components/VideoCard';
 
 // 标题标准化：统一转小写，去除非核心词，用作去重指纹
 const getUniqueKey = (item: any) => {
-  const title = (item.title || item.name || '').toLowerCase().replace(/[\(\（].*?[\)\）]|[\d\s\-\:]/g, '');
-  const year = item.year || '0';
-  return `${title}_${year}`; // 用 标题+年份 作为唯一指纹，极其精准
+  return item.id ? item.id : `${(item.title || item.name || '').trim()}_${item.year || '0'}`;
 };
 
 function DoubanPageClient() {
@@ -82,13 +80,15 @@ function DoubanPageClient() {
       let list: DoubanItem[] = [];
 
       if (secondarySelection === 'tv_Thailand') {
-        // 核心：移除硬编码关键词，只保留大范围搜索，避免搜索结果重叠
-        const keywords = ['泰国剧'','泰剧', '泰国', 'Thai', 
+        // 修复：修正了之前的语法错误，包含了所有热门剧名种子
+        const keywords = [
+            '泰剧', '泰国', 'Thai', 
             '禁忌女孩', '天生一对', 
             '以你的心诠释我的爱', '特长生', 
             '黑帮少爷爱上我', '学姐可以当老师', 
             '只是朋友', '只因我们天生一对', 
-            '绝庙骗局', 'Shine', 'Mad Unicorn'];
+            '绝庙骗局', 'Shine', 'Mad Unicorn'
+        ];
         const pg = Math.floor(pageStart / 25) + 1;
         
         const results = await Promise.all(
@@ -97,16 +97,16 @@ function DoubanPageClient() {
         
         const allResults = results.flatMap(r => r.results || r.list || []);
         
-        const blacklist = ['AFC', '锦标赛', '足球', '比赛', '亚足联', '预选赛', '世界杯', 'Logo', '积分榜', '女足', 'NBA', '亚洲杯', '泰国性痴迷', '亚运会', '男足', '回放', '世预赛', '世预亚','狂野泰国','冲游泰国','到了30岁还是处男','男足', '亚残运会', '泰国大象医院', '冲遊泰国', '野性泰国','T台新面孔', '泰国72小时粤语', '觉醒眼神后', '幸存者', '空中看泰国', '南洋大宝荐'];
+        const blacklist = ['AFC', '锦标赛', '足球', '比赛', '亚足联', '预选赛', '世界杯', 'Logo', '积分榜', '女足', 'NBA', '亚洲杯', '泰国性痴迷', '亚运会', '男足', '回放', '世预赛', '世预亚','狂野泰国','冲游泰国','到了30岁还是处男','男足', '亚残运会', '泰国大象医院', '冲遊泰国', '野性泰国','T台新面孔', '泰国72小时粤语', '觉醒眼神后', '幸存者', '空中看泰国', '南洋大宝荐', '短剧', '爽文', '微剧'];
         
         const uniqueMap = new Map<string, DoubanItem>();
         
         allResults.forEach((item: any) => {
             const rawTitle = item.title || item.name || '';
-            const uniqueKey = getUniqueKey(item); // 使用计算出的指纹去重
             const isNoise = blacklist.some(kw => rawTitle.includes(kw));
             
             if (!isNoise && rawTitle.length > 0) {
+                const uniqueKey = getUniqueKey(item); 
                 if (!uniqueMap.has(uniqueKey)) {
                     uniqueMap.set(uniqueKey, {
                         id: item.id || '',
@@ -135,7 +135,6 @@ function DoubanPageClient() {
 
       setDoubanData(prev => {
           const combined = isMore ? [...prev, ...list] : list;
-          // 全局双重校验
           const finalMap = new Map();
           combined.forEach(item => finalMap.set(getUniqueKey(item), item));
           return Array.from(finalMap.values()).sort((a, b) => parseInt(b.year || '0') - parseInt(a.year || '0'));
