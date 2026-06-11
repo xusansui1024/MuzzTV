@@ -4,7 +4,7 @@ import { createContext, ReactNode, useContext } from 'react';
 
 const SiteContext = createContext<{ siteName: string; announcement?: string }>({
   // 默认值
-  siteName: 'MoonTV',
+  siteName: '蜡笔小徐',
   announcement:
     '',
 });
