@@ -2,24 +2,18 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 
 import { getDoubanCategories, getDoubanList } from '@/lib/douban.client';
 import { DoubanItem } from '@/lib/types';
 
-import DoubanCardSkeleton from '@/components/DoubanCardSkeleton';
 import DoubanSelector from '@/components/DoubanSelector';
 import PageLayout from '@/components/PageLayout';
 import VideoCard from '@/components/VideoCard';
 
 type DisplayItem = DoubanItem & { isGroup?: boolean; groupItems?: DoubanItem[] };
 
-// 分组键：仅对比标题（大幅简化，只保留中文和英文）
-const getGroupKey = (item: any) => {
-  const title = (item.title || item.name || '').toLowerCase();
-  // 提取标题中的核心文字（去掉版本号、括号、年份等干扰）
-  return title.replace(/[\(\（].*?[\)\）]|[\d\s\-\:]|hd|高清|未删减|泰版|粤语/g, '').trim();
-};
+const getGroupKey = (item: any) => (item.title || item.name || '').toLowerCase().replace(/[\(\（].*?[\)\）]|[\d\s\-\:]|hd|高清|未删减|泰版|粤语/g, '').trim();
 
 function DoubanPageClient() {
   const searchParams = useSearchParams();
@@ -37,20 +31,13 @@ function DoubanPageClient() {
     type === 'movie' ? '全部' : type === 'tv' ? 'tv' : type === 'show' ? 'show' : '全部'
   );
 
-  // 同步 URL 参数变化
-  useEffect(() => {
-    if (type === 'movie') { setPrimarySelection('热门'); setSecondarySelection('全部'); }
-    else if (type === 'tv') { setPrimarySelection(''); setSecondarySelection('tv'); }
-    else if (type === 'show') { setPrimarySelection(''); setSecondarySelection('show'); }
-  }, [type]);
-
   const fetchData = useCallback(async (pageStart: number, isMore: boolean) => {
     try {
       setLoading(!isMore);
       let rawList: DoubanItem[] = [];
 
       if (secondarySelection === 'tv_Thailand') {
-        const keywords = ['泰剧', '泰国', 'Thai', '禁忌女孩', '以你的心诠释我的爱', '特长生', '黑帮少爷爱上我', '学姐可以当老师', '只是朋友', '只因我们天生一对', '绝庙骗局', 'Shine', 'Mad Unicorn'];
+        const keywords = ['泰剧', '泰国', 'Thai', '禁忌女孩', '以你的心诠释我的爱','黑帮少爷爱上我'];
         const pg = Math.floor(pageStart / 25) + 1;
         const results = await Promise.all(keywords.map(kw => fetch(`/api/search?q=${encodeURIComponent(kw)}&pg=${pg}`).then(r => r.json())));
         rawList = results.flatMap(r => r.results || r.list || []);
@@ -60,7 +47,7 @@ function DoubanPageClient() {
       } else {
         const data = await getDoubanCategories({ 
             kind: (type === 'tv' || type === 'show') ? 'tv' : 'movie', 
-            category: type === 'movie' ? 'movie' : (type === 'tv' || type === 'show' ? type : primarySelection), 
+            category: type === 'movie' ? 'movie' : (type === 'tv' || type === 'show') ? type : primarySelection, 
             type: secondarySelection, 
             pageLimit: 25, 
             pageStart 
@@ -71,7 +58,6 @@ function DoubanPageClient() {
       const blacklist = ['AFC', '锦标赛', '足球', '比赛', '亚足联', '预选赛', '世界杯', 'Logo', '积分榜', '女足', 'NBA', '亚洲杯', '泰国性痴迷', '亚运会', '男足', '回放', '世预赛', '世预亚','狂野泰国','冲游泰国','到了30岁还是处男','男足', '亚残运会', '泰国大象医院', '冲遊泰国', '野性泰国','T台新面孔', '泰国72小时粤语', '觉醒眼神后', '幸存者', '空中看泰国', '南洋大宝荐', '短剧', '爽文', '微剧','LoveLive', 'Sunshine', '宝石宠物', '二次元', '动漫', '动画', '剧场版','REBD', '写真', 'JAV', 'AV', '无码', '有码', 'Adult', 'Yuria', 'Yui3', 'Towa'];
       const filteredList = rawList.filter(item => !blacklist.some(kw => (item.title || '').includes(kw)));
 
-      // 分组逻辑
       const groupMap = new Map<string, DoubanItem[]>();
       filteredList.forEach(item => {
         const key = getGroupKey(item);
@@ -94,25 +80,29 @@ function DoubanPageClient() {
 
   useEffect(() => {
     fetchData(0, false);
-  }, [type, tag, custom, primarySelection, secondarySelection]);
+  }, [type, tag, custom, primarySelection, secondarySelection, fetchData]);
 
   return (
     <PageLayout activePath={`/douban?type=${type}&tag=${tag}`}>
       <div className='px-4 sm:px-10 py-4 sm:py-8'>
         <div className='grid grid-cols-3 gap-x-2 gap-y-12 sm:grid-cols-[repeat(auto-fit,minmax(160px,1fr))] sm:gap-x-8 sm:gap-y-20'>
           {doubanData.map((item, i) => (
-            <div key={`${item.id}-${i}`} className="relative transition-transform hover:scale-105" 
-                onClick={(e) => {
-                    // 仅当点击分组卡片时触发弹窗，并阻止事件冒泡到 VideoCard
-                    if (item.isGroup) {
-                        e.stopPropagation();
-                        setSelectedGroup(item);
-                    }
-                }}>
-               <VideoCard from='douban' title={item.title} poster={item.poster} douban_id={item.id} rate={item.rate} year={item.year} type={type === 'movie' ? 'movie' : ''} />
+            <div key={`${item.id}-${i}`} className="relative group">
+               {/* 如果是分组，盖上一层透明遮罩，彻底阻断 VideoCard 的所有点击交互 */}
+               {item.isGroup && (
+                 <div 
+                   className="absolute inset-0 z-50 cursor-pointer" 
+                   onClick={() => setSelectedGroup(item)}
+                 />
+               )}
+               
+               {/* VideoCard 在这里，如果 isGroup 为真，由于 pointer-events-none 的辅助，它对鼠标是透明的 */}
+               <div className={item.isGroup ? "pointer-events-none" : ""}>
+                 <VideoCard from='douban' title={item.title} poster={item.poster} douban_id={item.id} rate={item.rate} year={item.year} type={type === 'movie' ? 'movie' : ''} />
+               </div>
                
                {item.isGroup && (
-                 <div className="absolute top-2 right-2 bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full font-bold shadow-md pointer-events-none">
+                 <div className="absolute top-2 right-2 bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full font-bold shadow-md z-10 pointer-events-none">
                    {item.groupItems?.length} 版本
                  </div>
                )}
@@ -120,8 +110,9 @@ function DoubanPageClient() {
           ))}
         </div>
 
+        {/* 弹窗部分保持不变 */}
         {selectedGroup && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={() => setSelectedGroup(null)}>
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={() => setSelectedGroup(null)}>
             <div className="bg-white rounded-xl p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
               <h2 className="text-xl font-bold mb-4">{selectedGroup.title} 的所有版本</h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
