@@ -67,7 +67,7 @@ function DoubanPageClient() {
     pageStart,
   }), [type, primarySelection, secondarySelection]);
 
-  // 智能数据获取函数（加入了黑名单过滤，剔除体育赛事等杂质）
+  // 智能数据获取函数
   const fetchData = useCallback(async (pageStart: number, isMore: boolean) => {
     try {
       if (isMore) setIsLoadingMore(true);
@@ -76,27 +76,27 @@ function DoubanPageClient() {
       let list: DoubanItem[] = [];
 
       if (secondarySelection === 'tv_Thailand') {
-        const keywords = ['泰剧', '泰国', '泰版'];
+        const keywords = ['泰剧', '泰国', 'Thai'];
+        // 计算当前页码 (每页 25 条)
+        const pg = Math.floor(pageStart / 25) + 1;
+        
         const results = await Promise.all(
-            keywords.map(kw => fetch(`/api/search?q=${encodeURIComponent(kw)}`).then(r => r.json()))
+            keywords.map(kw => fetch(`/api/search?q=${encodeURIComponent(kw)}&pg=${pg}`).then(r => r.json()))
         );
         
-        const allResults = results.flatMap(r => r.results || []);
+        const allResults = results.flatMap(r => r.results || r.list || []);
         
-        // 关键词白名单
-        const thaiKeywords = ['泰', '泰国', '泰剧', '泰版', '泰语', '泰国版'];
-        // 黑名单：剔除掉非影视类的干扰信息
+        // 黑名单：剔除干扰项
         const blacklist = ['AFC', '锦标赛', '足球', '比赛', '亚足联', '预选赛', '世界杯', 'Logo', '积分榜', '女足', 'NBA', '亚洲杯', '泰国性痴迷', '亚运会', '男足', '回放', '世预赛', '世预亚','狂野泰国','冲游泰国','到了30岁还是处男','男足', '亚残运会', '泰国大象医院', '冲遊泰国', '野性泰国','T台新面孔', '泰国72小时粤语', '觉醒眼神后', '幸存者', '空中看泰国', '南洋大宝荐'];
         
         const uniqueMap = new Map<string, DoubanItem>();
         
         allResults.forEach((item: any) => {
             const title = item.title || item.name || '';
-            const isThai = thaiKeywords.some(keyword => title.includes(keyword));
             const isNoise = blacklist.some(kw => title.includes(kw));
             
-            // 只有属于泰剧 且 不属于黑名单的，才会被加入
-            if (isThai && !isNoise) {
+            // 只要不是黑名单的，全部收录（移除 isThai 检测，不再强制标题含“泰”）
+            if (!isNoise && title.length > 0) {
                 if (!uniqueMap.has(title)) {
                     uniqueMap.set(title, {
                         id: item.id || '',
@@ -108,20 +108,24 @@ function DoubanPageClient() {
                 }
             }
         });
+        
         list = Array.from(uniqueMap.values());
+        setHasMore(list.length >= 25); // 如果返回了25条，说明可能还有更多
       } 
       else if (custom) {
         const data = await getDoubanList({ tag, type, pageLimit: 25, pageStart });
         if (data.code === 200) list = data.list;
+        setHasMore(list.length === 25);
       } else {
         const data = await getDoubanCategories(getRequestParams(pageStart));
         if (data.code === 200) list = data.list;
+        setHasMore(list.length === 25);
       }
 
       setDoubanData(prev => isMore ? [...prev, ...list] : list);
-      setHasMore(false); 
     } catch (err) {
       console.error("加载数据出错:", err);
+      setHasMore(false);
     } finally {
       if (isMore) setIsLoadingMore(false);
       else setLoading(false);
