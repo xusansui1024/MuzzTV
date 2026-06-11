@@ -48,8 +48,8 @@ export default function Announcement() {
           borderBottomRightRadius: '8px',
           marginBottom: '24px'
         }}>
-          <p style={{ margin: 0, color: '#4b5563', fontSize: '18px', lineHeight: '1.6' }}>
-            ✨✨发现任何问题,请随时联系小徐✨✨
+          <p style={{ margin: 0, color: '#4b5563', fontSize: '16px', lineHeight: '1.6' }}>
+            ✨发现任何问题,请随时联系小徐✨
           </p>
         </div>
 
