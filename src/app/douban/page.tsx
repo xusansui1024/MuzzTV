@@ -101,6 +101,7 @@ function DoubanPageClient() {
   const loadInitialData = useCallback(async () => {
     try {
       setLoading(true);
+      console.log("开始请求数据...");
       let data: DoubanResult;
 
       // 逻辑清晰：泰剧优先，其次 Custom，最后默认
@@ -123,6 +124,7 @@ function DoubanPageClient() {
       }
 
       if (data.code === 200) {
+        console.log("成功获取到数据:", data.list);
         setDoubanData(data.list);
         setHasMore(data.list.length === 25);
         setLoading(false);
