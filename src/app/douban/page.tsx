@@ -67,7 +67,7 @@ function DoubanPageClient() {
     pageStart,
   }), [type, primarySelection, secondarySelection]);
 
-  // 智能数据获取函数（已修复分页加载逻辑，并保留去重与清洗）
+  // 智能数据获取函数（多关键词聚合版）
   const fetchData = useCallback(async (pageStart: number, isMore: boolean) => {
     try {
       if (isMore) setIsLoadingMore(true);
@@ -76,16 +76,18 @@ function DoubanPageClient() {
       let list: DoubanItem[] = [];
 
       if (secondarySelection === 'tv_Thailand') {
-        // 计算当前页码（每页 25 个）
-        const page = Math.floor(pageStart / 25) + 1;
-        const res = await fetch(`/api/search?q=${encodeURIComponent('泰剧')}&page=${page}`);
-        const json = await res.json();
+        // 同时发起多个关键词搜索，跳过 page 参数
+        const keywords = ['泰剧', '泰国', '泰版'];
+        const results = await Promise.all(
+            keywords.map(kw => fetch(`/api/search?q=${encodeURIComponent(kw)}`).then(r => r.json()))
+        );
         
-        // 关键词白名单
+        const allResults = results.flatMap(r => r.results || []);
+        
         const thaiKeywords = ['泰', '泰国', '泰剧', '泰版', '泰语', '泰国版'];
         const uniqueMap = new Map<string, DoubanItem>();
         
-        (json.results || []).forEach((item: any) => {
+        allResults.forEach((item: any) => {
             const title = item.title || item.name || '';
             const isThai = thaiKeywords.some(keyword => title.includes(keyword));
             
@@ -112,8 +114,8 @@ function DoubanPageClient() {
       }
 
       setDoubanData(prev => isMore ? [...prev, ...list] : list);
-      // 如果获取到了数据，说明可能还有更多，这里设为 true 以触发观察者
-      setHasMore(list.length >= 10); 
+      // 聚合模式下不分页，所以设为 false
+      setHasMore(false); 
     } catch (err) {
       console.error("加载数据出错:", err);
     } finally {
