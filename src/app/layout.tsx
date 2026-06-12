@@ -78,8 +78,7 @@ export default async function RootLayout({
 
   // --- 强制覆盖逻辑 ---
   siteName = '蜡笔小徐';
-  announcement = '✨发现任何问题,请随时联系小徐✨'; // <--- 在这里输入你想说的文字
-
+  announcement = '✨发现任何问题,请随时联系小徐✨'; // <--- 输入需要转达的公告
   // 将运行时配置注入到全局 window 对象
   const runtimeConfig = {
     STORAGE_TYPE: process.env.NEXT_PUBLIC_STORAGE_TYPE || 'localstorage',
