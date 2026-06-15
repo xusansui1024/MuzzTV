@@ -16,7 +16,7 @@ const inter = Inter({ subsets: ['latin'] });
 
 // 动态生成 metadata
 export async function generateMetadata(): Promise<Metadata> {
-  let siteName = process.env.SITE_NAME || '蜡笔小徐';
+  let siteName = process.env.SITE_NAME || '慕朝朝TV';
   if (
     process.env.NEXT_PUBLIC_STORAGE_TYPE !== 'd1' &&
     process.env.NEXT_PUBLIC_STORAGE_TYPE !== 'upstash'
@@ -26,7 +26,7 @@ export async function generateMetadata(): Promise<Metadata> {
   }
 
   // --- 强制覆盖逻辑 ---
-  siteName = '蜡笔小徐';
+  siteName = '慕朝朝TV';
 
   return {
     title: siteName,
@@ -45,7 +45,7 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  let siteName = process.env.SITE_NAME || '蜡笔小徐';
+  let siteName = process.env.SITE_NAME || '慕朝朝TV';
   let announcement = process.env.ANNOUNCEMENT || '';
   let enableRegister = process.env.NEXT_PUBLIC_ENABLE_REGISTER === 'true';
   let imageProxy = process.env.NEXT_PUBLIC_IMAGE_PROXY || '';
@@ -77,8 +77,8 @@ export default async function RootLayout({
   }
 
   // --- 强制覆盖逻辑 ---
-  siteName = '蜡笔小徐';
-  announcement = '✨发现任何问题,请随时联系小徐✨'; // <--- 输入需要转达的公告
+  siteName = '慕朝朝TV';
+  announcement = '✨发现任何问题,请随时联系✨'; // <--- 输入需要转达的公告
   // 将运行时配置注入到全局 window 对象
   const runtimeConfig = {
     STORAGE_TYPE: process.env.NEXT_PUBLIC_STORAGE_TYPE || 'localstorage',
