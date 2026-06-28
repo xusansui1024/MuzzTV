@@ -1,4 +1,4 @@
-# MoonTV
+# MuzzTV
 
 <div align="center">
   <img src="public/logo.png" alt="LibreTV Logo" width="120">
