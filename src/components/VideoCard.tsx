@@ -114,7 +114,7 @@ export default function VideoCard({
             referrerPolicy='no-referrer'
             onLoadingComplete={() => setIsLoading(true)}
             onError={() => {
-                console.error('VideoCard 图片加载失败，代理地址:', processImageUrl(actualPoster));
+                console.log("图片加载失败，请查看Network里的Response:", e.currentTarget.src);
                 setHasError(true);
             }}
           />
