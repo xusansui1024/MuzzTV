@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { deleteFavorite, deletePlayRecord, generateStorageKey, isFavorited, saveFavorite, subscribeToDataUpdates } from '@/lib/db.client';
 import { SearchResult } from '@/lib/types';
-import { processImageUrl } from '@/lib/utils';
+import { getImageProxyUrl } from '@/lib/utils';
 import { ImagePlaceholder } from '@/components/ImagePlaceholder';
 
 interface VideoCardProps {
@@ -24,6 +24,7 @@ export default function VideoCard({
   const [favorited, setFavorited] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [hasError, setHasError] = useState(false);
+  const [retryLevel, setRetryLevel] = useState(0);
 
   const isAggregate = from === 'search' && !!items?.length;
   const aggregateData = useMemo(() => {
@@ -52,6 +53,19 @@ export default function VideoCard({
   const actualYear = aggregateData?.first.year ?? year;
   const actualQuery = query || '';
   const actualSearchType = isAggregate ? (aggregateData?.first.episodes?.length === 1 ? 'movie' : 'tv') : type;
+
+  // 多级代理容灾计算（自动降级：主力代理 -> wsrv.nl 公共CDN -> 原始链接）
+  const currentImgSrc = useMemo(() => {
+    if (!actualPoster) return '';
+    const customProxy = getImageProxyUrl();
+    if (retryLevel === 0) {
+      return customProxy ? `${customProxy}${encodeURIComponent(actualPoster)}` : actualPoster;
+    } else if (retryLevel === 1) {
+      return `https://wsrv.nl/?url=${encodeURIComponent(actualPoster)}`;
+    } else {
+      return actualPoster;
+    }
+  }, [actualPoster, retryLevel]);
 
   useEffect(() => {
     if (from === 'douban' || !actualSource || !actualId) return;
@@ -105,17 +119,20 @@ export default function VideoCard({
     <div className='group relative w-full rounded-lg bg-transparent cursor-pointer transition-all duration-300 ease-in-out hover:scale-[1.05] hover:z-[500]' onClick={handleClick}>
       <div className='relative aspect-[2/3] overflow-hidden rounded-lg'>
         {(!isLoading || hasError) && <ImagePlaceholder aspectRatio='aspect-[2/3]' />}
-        {!hasError && (
+        {!hasError && currentImgSrc && (
           <Image
-            src={processImageUrl(actualPoster)}
+            src={currentImgSrc}
             alt={actualTitle}
             fill
             className='object-cover'
             referrerPolicy='no-referrer'
             onLoadingComplete={() => setIsLoading(true)}
             onError={() => {
-                console.log("图片加载失败，请查看Network里的Response:", e.currentTarget.src);
+              if (retryLevel < 2) {
+                setRetryLevel(prev => prev + 1);
+              } else {
                 setHasError(true);
+              }
             }}
           />
         )}
