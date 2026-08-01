@@ -9,7 +9,6 @@ export default async function handler(req, res) {
   }
 
   // 2. 健壮地获取目标 URL (通过 URL API 解析，彻底解决参数截断问题)
-  // 将 req.url 构造为一个完整 URL 对象以便解析参数
   const baseUrl = `http://${req.headers.host}`;
   const fullUrl = new URL(req.url, baseUrl);
   const targetUrl = fullUrl.searchParams.get('url');
@@ -32,18 +31,18 @@ export default async function handler(req, res) {
       headers['Origin'] = 'https://www.douban.com/';
     }
 
-    // 4. 设置请求超时控制器 (Vercel 性能优化的关键)
+    // 4. 设置请求超时控制器 (8秒超时)
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000); // 8秒超时
+    const timeout = setTimeout(() => controller.abort(), 8000);
 
     // 5. 执行代理请求
     const response = await fetch(targetUrl, {
       method: 'GET',
       headers: headers,
-      signal: controller.signal // 绑定超时控制器
+      signal: controller.signal
     });
 
-    clearTimeout(timeout); // 请求完成即清除定时器
+    clearTimeout(timeout);
 
     if (!response.ok) {
       throw new Error(`Target returned ${response.status}`);
@@ -52,7 +51,6 @@ export default async function handler(req, res) {
     // 6. 传递响应头
     const contentType = response.headers.get('content-type') || 'image/jpeg';
     res.setHeader('Content-Type', contentType);
-    // 强制缓存：1周 (减少服务器压力)
     res.setHeader('Cache-Control', 'public, max-age=604800, s-maxage=604800');
 
     // 7. 处理响应体
