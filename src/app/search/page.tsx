@@ -4,6 +4,7 @@
 import { ChevronUp, Search, X } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Converter } from 'opencc-js';
 
 import {
   addSearchHistory,
@@ -16,6 +17,9 @@ import { SearchResult } from '@/lib/types';
 
 import PageLayout from '@/components/PageLayout';
 import VideoCard from '@/components/VideoCard';
+
+// 初始化繁转简转换器（繁体 -> 中国大陆简体）
+const converter = Converter({ from: 'hk', to: 'cn' });
 
 function SearchPageClient() {
   // 搜索历史
@@ -145,14 +149,15 @@ function SearchPageClient() {
   }, []);
 
   useEffect(() => {
-    // 当搜索参数变化时更新搜索状态
+    // 当搜索参数变化时更新搜索状态（自动将 URL 中的繁体转为简体进行检索）
     const query = searchParams.get('q');
     if (query) {
-      setSearchQuery(query);
-      fetchSearchResults(query);
+      const simplifiedQuery = converter(query);
+      setSearchQuery(simplifiedQuery);
+      fetchSearchResults(simplifiedQuery);
 
       // 保存到搜索历史 (事件监听会自动更新界面)
-      addSearchHistory(query);
+      addSearchHistory(simplifiedQuery);
     } else {
       setShowResults(false);
     }
@@ -205,17 +210,20 @@ function SearchPageClient() {
     const trimmed = searchQuery.trim().replace(/\s+/g, ' ');
     if (!trimmed) return;
 
+    // 核心：输入繁体字时，自动转换为简体字再进行检索
+    const simplified = converter(trimmed);
+
     // 回显搜索框
-    setSearchQuery(trimmed);
+    setSearchQuery(simplified);
     setIsLoading(true);
     setShowResults(true);
 
-    router.push(`/search?q=${encodeURIComponent(trimmed)}`);
+    router.push(`/search?q=${encodeURIComponent(simplified)}`);
     // 直接发请求
-    fetchSearchResults(trimmed);
+    fetchSearchResults(simplified);
 
     // 保存到搜索历史 (事件监听会自动更新界面)
-    addSearchHistory(trimmed);
+    addSearchHistory(simplified);
   };
 
   // 返回顶部功能
@@ -390,7 +398,7 @@ function SearchPageClient() {
         onClick={scrollToTop}
         className={`fixed bottom-20 md:bottom-6 right-6 z-[500] w-12 h-12 bg-green-500/90 hover:bg-green-500 text-white rounded-full shadow-lg backdrop-blur-sm transition-all duration-300 ease-in-out flex items-center justify-center group ${
           showBackToTop
-            ? 'opacity-100 translate-y-0 pointer-events-auto'
+            ? 'opacity-100 translate-y-0 pointer-events-none'
             : 'opacity-0 translate-y-4 pointer-events-none'
         }`}
         aria-label='返回顶部'
