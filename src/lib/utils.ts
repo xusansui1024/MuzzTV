@@ -2,20 +2,18 @@
 import Hls from 'hls.js';
 
 /**
- * 获取图片代理 URL 设置 - 彻底重构版
+ * 获取图片代理 URL 设置 - 绝对优先版
  */
 export function getImageProxyUrl(): string {
-  // 1. 强制优先读取 Vercel 构建时的环境变量 (最稳定)
   const envProxy = process.env.NEXT_PUBLIC_IMAGE_PROXY;
   if (envProxy && envProxy.trim().startsWith('http')) {
     return envProxy.trim();
   }
 
-  // 2. 如果环境变量没有，才去读 localStorage (允许用户在设置页覆盖)
   if (typeof window !== 'undefined') {
     const enableImageProxy = localStorage.getItem('enableImageProxy');
     if (enableImageProxy !== null && !JSON.parse(enableImageProxy)) {
-      return ''; // 如果用户关闭了代理，返回空字符串
+      return ''; 
     }
 
     const localImageProxy = localStorage.getItem('imageProxyUrl');
@@ -24,7 +22,6 @@ export function getImageProxyUrl(): string {
     }
   }
 
-  // 3. 终极兜底：如果不幸以上都失败，强制返回 wsrv.nl
   return 'https://wsrv.nl/?url=';
 }
 
@@ -33,13 +30,8 @@ export function getImageProxyUrl(): string {
  */
 export function processImageUrl(originalUrl: string): string {
   if (!originalUrl) return originalUrl;
-
   const proxyUrl = getImageProxyUrl();
-  
-  // 如果没有代理，直接返回原始地址
   if (!proxyUrl) return originalUrl;
-
-  // 这里的关键：确保 proxyUrl 后面连接正确
   return `${proxyUrl}${encodeURIComponent(originalUrl)}`;
 }
 
@@ -47,13 +39,11 @@ export function processImageUrl(originalUrl: string): string {
  * 获取豆瓣代理 URL 设置
  */
 export function getDoubanProxyUrl(): string | null {
-  // 1. 优先读取 Vercel 环境配置
   const envDoubanProxy = process.env.NEXT_PUBLIC_DOUBAN_PROXY;
   if (envDoubanProxy && envDoubanProxy.trim().startsWith('http')) {
     return envDoubanProxy.trim();
   }
 
-  // 2. 本地设置
   if (typeof window !== 'undefined') {
     const enableDoubanProxy = localStorage.getItem('enableDoubanProxy');
     if (enableDoubanProxy !== null && !JSON.parse(enableDoubanProxy)) {
@@ -64,8 +54,96 @@ export function getDoubanProxyUrl(): string | null {
       return localDoubanProxy.trim();
     }
   }
-
   return null;
 }
 
-// ... (cleanHtmlTags 和 getVideoResolutionFromM3u8 代码保持不变，不需要动)
+/**
+ * 处理豆瓣 URL
+ */
+export function processDoubanUrl(originalUrl: string): string {
+  if (!originalUrl) return originalUrl;
+  const proxyUrl = getDoubanProxyUrl();
+  if (!proxyUrl) return originalUrl;
+  return `${proxyUrl}${encodeURIComponent(originalUrl)}`;
+}
+
+export function cleanHtmlTags(text: string): string {
+  if (!text) return '';
+  return text
+    .replace(/<[^>]+>/g, '\n')
+    .replace(/\n+/g, '\n')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/^\n+|\n+$/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .trim();
+}
+
+export async function getVideoResolutionFromM3u8(m3u8Url: string): Promise<{
+  quality: string;
+  loadSpeed: string;
+  pingTime: number;
+}> {
+  try {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement('video');
+      video.muted = true;
+      video.preload = 'metadata';
+      const pingStart = performance.now();
+      let pingTime = 0;
+      fetch(m3u8Url, { method: 'HEAD', mode: 'no-cors' })
+        .then(() => { pingTime = performance.now() - pingStart; })
+        .catch(() => { pingTime = performance.now() - pingStart; });
+      const hls = new Hls();
+      const timeout = setTimeout(() => {
+        hls.destroy(); video.remove();
+        reject(new Error('Timeout loading video metadata'));
+      }, 4000);
+      video.onerror = () => {
+        clearTimeout(timeout);
+        hls.destroy(); video.remove();
+        reject(new Error('Failed to load video metadata'));
+      };
+      let actualLoadSpeed = '未知';
+      let hasSpeedCalculated = false;
+      let hasMetadataLoaded = false;
+      let fragmentStartTime = 0;
+      const checkAndResolve = () => {
+        if (hasMetadataLoaded && (hasSpeedCalculated || actualLoadSpeed !== '未知')) {
+          clearTimeout(timeout);
+          const width = video.videoWidth;
+          if (width && width > 0) {
+            hls.destroy(); video.remove();
+            const quality = width >= 3840 ? '4K' : width >= 2560 ? '2K' : width >= 1920 ? '1080p' : width >= 1280 ? '720p' : width >= 854 ? '480p' : 'SD';
+            resolve({ quality, loadSpeed: actualLoadSpeed, pingTime: Math.round(pingTime) });
+          } else {
+            resolve({ quality: '未知', loadSpeed: actualLoadSpeed, pingTime: Math.round(pingTime) });
+          }
+        }
+      };
+      hls.on(Hls.Events.FRAG_LOADING, () => { fragmentStartTime = performance.now(); });
+      hls.on(Hls.Events.FRAG_LOADED, (event: any, data: any) => {
+        if (fragmentStartTime > 0 && data?.payload && !hasSpeedCalculated) {
+          const loadTime = performance.now() - fragmentStartTime;
+          const size = data.payload.byteLength || 0;
+          if (loadTime > 0 && size > 0) {
+            const speedKBps = size / 1024 / (loadTime / 1000);
+            actualLoadSpeed = speedKBps >= 1024 ? `${(speedKBps / 1024).toFixed(1)} MB/s` : `${speedKBps.toFixed(1)} KB/s`;
+            hasSpeedCalculated = true;
+            checkAndResolve();
+          }
+        }
+      });
+      hls.loadSource(m3u8Url);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.ERROR, (event: any, data: any) => {
+        if (data.fatal) {
+          clearTimeout(timeout); hls.destroy(); video.remove();
+          reject(new Error(`HLS播放失败: ${data.type}`));
+        }
+      });
+      video.onloadedmetadata = () => { hasMetadataLoaded = true; checkAndResolve(); };
+    });
+  } catch (error) {
+    throw new Error(`Error getting video resolution: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
