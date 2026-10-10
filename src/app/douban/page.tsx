@@ -5,7 +5,6 @@ import { useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 
 import { getDoubanCategories, getDoubanList } from '@/lib/douban.client';
-import { normalizeTitle } from '@/lib/normalizeTitle';
 import { DoubanItem } from '@/lib/types';
 
 import DoubanCardSkeleton from '@/components/DoubanCardSkeleton';
@@ -25,11 +24,12 @@ const getUniqueKey = (item: DisplayItem) => {
 };
 
 // 分组聚合键：提取标题核心，将同名/不同版本的剧集聚类
+// （剥除"泰剧"后缀，使"天生一对泰剧"与"天生一对"合并为同一部）
 const getGroupKey = (item: DisplayItem) => {
   return (item.title || '')
     .toLowerCase()
     .replace(
-      /[()（].*?[)）]|[\d\s\-:]|hd|高清|未删减|泰版|粤语|日语|韩语|美剧/g,
+      /[()（].*?[)）]|[\d\s\-:]|hd|高清|未删减|泰剧|泰版|粤语|日语|韩语|美剧/g,
       ''
     )
     .trim();
@@ -109,54 +109,13 @@ function DoubanPageClient() {
 
         // 1. 获取基础数据
         if (secondarySelection === 'tv_Thailand') {
-          // 泰剧走源聚合关键词搜索（豆瓣泰剧标签已失效，实测返回 0 条）。
-          // 源接口搜"泰国/Thai"会返回大量无关欧美剧（模糊匹配/热门列表），
-          // 因此对每个关键词的结果做"标题必须包含该关键词"的过滤后再合并。
-          const keywords = [
-            '泰剧',
-            '泰国',
-            'Thai',
-            '禁忌女孩',
-            '天生一对',
-            '以你的心诠释我的爱',
-            '黑帮少爷爱上我',
-            '绝庙骗局',
-            '泰版',
-            'sotus',
-            'kinnporsche',
-            '我的会长男友',
-          ];
-          const pg = Math.floor(pageStart / 25) + 1;
-          // 每个关键词独立容错：单个失败（接口超时/网络错误）只跳过该词，不拖垮整个分类
-          const results = await Promise.all(
-            keywords.map(async (kw) => {
-              try {
-                const data = await fetch(
-                  `/api/search?q=${encodeURIComponent(kw)}&pg=${pg}`
-                ).then((r) => r.json());
-                const nq = normalizeTitle(kw);
-                return (
-                  (data.results || data.list || []) as Array<
-                    Record<string, unknown>
-                  >
-                )
-                  .filter((it) => {
-                    const t = String(it.title || it.name || '');
-                    return nq && normalizeTitle(t).includes(nq);
-                  })
-                  .map((it) => ({
-                    id: String(it.id || ''),
-                    title: String(it.title || it.name || ''),
-                    poster: String(it.poster || it.pic || ''),
-                    rate: '',
-                    year: String(it.year || ''),
-                  }));
-              } catch {
-                return [];
-              }
-            })
+          // 泰剧走后端聚合接口（/api/douban/thailand）：
+          // 12 个关键词 × 20 个源在服务器端并行搜索、过滤、去重后一次返回，
+          // 浏览器只需 1 次请求，避免原来 12 个搜索请求逐个等待造成卡顿。
+          const data = await fetch('/api/douban/thailand').then((r) =>
+            r.json()
           );
-          rawList = results.flat();
+          if (data.code === 200) rawList = data.list;
         } else if (custom) {
           const data = await getDoubanList({
             tag,
@@ -208,6 +167,7 @@ function DoubanPageClient() {
           'T台新面孔',
           '泰国72小时粤语',
           '觉醒眼神后',
+          '觉醒神眼后',
           '幸存者',
           '空中看泰国',
           '南洋大宝荐',
@@ -232,6 +192,11 @@ function DoubanPageClient() {
           'Yui3',
           'Towa',
           '分手后林先生来泰国了',
+          '东盟杯',
+          '战爷',
+          '你装傻我充楞',
+          '跑男',
+          '禁忌女孩(日版)',
         ];
         const filteredList = rawList.filter((item) => {
           const title = item.title || '';
@@ -266,7 +231,8 @@ function DoubanPageClient() {
           );
         });
 
-        setHasMore(rawList.length > 0);
+        // 泰剧聚合接口一次返回全部合并结果，无需无限滚动
+        setHasMore(secondarySelection !== 'tv_Thailand' && rawList.length > 0);
       } catch (err) {
         console.error('加载数据出错:', err);
         // 首次加载失败时清空旧数据：避免切换分类后仍显示上一个分类的内容（看起来像"没反应"）
@@ -382,12 +348,7 @@ function DoubanPageClient() {
                     />
                   </div>
 
-                  {/* 分组标识角标 */}
-                  {item.isGroup && (
-                    <div className='absolute top-2 right-2 bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full font-bold shadow-md z-10 pointer-events-none'>
-                      {item.groupItems?.length} 版本
-                    </div>
-                  )}
+                  {/* 分组标识角标已移除：不再显示"N 版本"文字 */}
                 </div>
               ))}
         </div>

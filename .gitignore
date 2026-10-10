@@ -12,6 +12,11 @@
 /.next/
 /out/
 
+# next-pwa 构建产物（每次 build 自动生成，不入库）
+/public/sw.js
+/public/sw.js.map
+/public/workbox-*.js
+
 # production
 /build
 
