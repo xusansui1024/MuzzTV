@@ -100,11 +100,11 @@
     "feisu": {
       "api": "https://suizzy.cc/api.php/provide/vod",
       "name": "飞速资源"
-    }
+    },
     "animezy": {
       "api": "https://api.agefans.vip/api.php/provide/vod",
       "name": "AGE動漫源"
-  }
+    }
   },
   "SiteConfig": {
     "DoubanProxy": "https://www.xiaoxu.online/api/proxy?url=",
