@@ -64,11 +64,9 @@ function SearchPageClient() {
     const map = new Map<string, SearchResult[]>();
 
     searchResults.forEach((item) => {
-      // 使用 title + year + type 作为键，year 必然存在，但依然兜底 'unknown'
-
-      const key = `${normalizeTitle(item.title)}-${item.year || 'unknown'}-${
-        item.episodes.length === 1 ? 'movie' : 'tv'
-      }`;
+      // 分组键仅使用归一化标题：同一部片的不同命名/年份/类型
+      // （如年份被源站标错、[电影解说]、普通话版、日文副标题）合并为一组
+      const key = normalizeTitle(item.title);
 
       const arr = map.get(key) || [];
 
