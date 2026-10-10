@@ -216,8 +216,18 @@ function SearchPageClient() {
 
       const data = await response.json();
 
+      // 过滤：仅保留标题包含搜索词的结果。
+      // 部分源站（如量子/暴风）搜索接口会返回无关结果（热门列表/模糊匹配），
+      // 归一化后做包含匹配可剔除；去标点后"哈利·波特"仍能匹配"哈利波特"。
+      const normalizedQuery = normalizeTitle(query.trim());
+      const filteredResults = (data.results as SearchResult[]).filter(
+        (result) =>
+          !normalizedQuery ||
+          normalizeTitle(result.title).includes(normalizedQuery)
+      );
+
       setSearchResults(
-        data.results.sort((a: SearchResult, b: SearchResult) => {
+        filteredResults.sort((a: SearchResult, b: SearchResult) => {
           // 优先排序：标题与搜索词完全一致的排在前面
 
           const aExactMatch = a.title === query.trim();

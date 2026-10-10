@@ -30,6 +30,11 @@ describe('normalizeTitle', () => {
     expect(normalizeTitle('Spirited Away')).toBe('spiritedaway');
   });
 
+  it('去除标点（哈利·波特 与 哈利波特 归并）', () => {
+    expect(normalizeTitle('哈利·波特')).toBe('哈利波特');
+    expect(normalizeTitle('千与千寻：神隐少女')).toBe('千与千寻神隐少女');
+  });
+
   it('空输入安全', () => {
     expect(normalizeTitle('')).toBe('');
     expect(normalizeTitle('  ')).toBe('');

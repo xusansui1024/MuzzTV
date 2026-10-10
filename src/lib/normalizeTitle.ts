@@ -23,6 +23,7 @@ export function normalizeTitle(raw: string): string {
     t = t.split(' ')[0];
   }
 
-  // 4. 去所有空白（含全角空格）并转小写，作为稳定的分组键
-  return t.replace(/\s+/g, '').toLowerCase();
+  // 4. 去除所有非中英文/数字字符（含标点·・：、空格等）并转小写，作为稳定的分组键
+  //    例：哈利·波特 → 哈利波特；Spirited Away → spiritedaway
+  return t.replace(/[^\u4e00-\u9fa5A-Za-z0-9]/g, '').toLowerCase();
 }
