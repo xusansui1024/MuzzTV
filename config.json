@@ -90,7 +90,7 @@
       "name": "红牛资源"
     },
     "guangsu": {
-      "api": "https://gszy.cc/inc/api.php",
+      "api": "https://gszy.cc/api.php/provide/vod",
       "name": "光速资源"
     }
   },
