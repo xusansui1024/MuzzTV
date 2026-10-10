@@ -9,6 +9,15 @@
       "api": "https://360zy.com/api.php/provide/vod",
       "name": "360资源"
     },
+    "lzi": {
+      "api": "https://cj.lziapi.com/api.php/provide/vod",
+      "name": "量子资源站"
+    },
+    "jinying": {
+      "api": "https://jyzyapi.com/api.php/provide/vod",
+      "name": "金鹰资源",
+      "detail": "https://jyzyapi.com"
+    },
     "dyttzy": {
       "api": "http://caiji.dyttzyapi.com/api.php/provide/vod",
       "name": "电影天堂资源",
@@ -44,10 +53,6 @@
       "api": "https://ikunzyapi.com/api.php/provide/vod",
       "name": "iKun资源"
     },
-    "lzi": {
-      "api": "https://cj.lziapi.com/api.php/provide/vod",
-      "name": "量子资源站"
-    },
     "hongniu": {
       "api": "https://www.hongniuzy2.com/api.php/provide/vod",
       "name": "红牛资源"
@@ -66,11 +71,6 @@
       "api": "https://subocaiji.com/api.php/provide/vod",
       "name": "速博资源",
       "detail": "https://subocaiji.com"
-    },
-    "jinying": {
-      "api": "https://jyzyapi.com/api.php/provide/vod",
-      "name": "金鹰资源",
-      "detail": "https://jyzyapi.com"
     },
     "piaoling": {
       "api": "https://p2100.net/api.php/provide/vod",
