@@ -86,7 +86,7 @@
       "name": "小猫咪资源"
     },
     "hongniu": {
-      "api": "https://www.hongniuzy2.com/inc/api.php",
+      "api": "https://www.hongniuzy2.com/api.php/provide/vod",
       "name": "红牛资源"
     },
     "guangsu": {
