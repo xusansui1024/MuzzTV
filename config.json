@@ -108,6 +108,22 @@
     "BilibiliAPI": {
       "api": "https://api.agefans.vip/api.php/provide/vod",
       "name": "AGE動漫"
+    },
+    "yiquan": {
+      "api": "http://47.97.68.224/api.php/provide/vod",
+      "name": "一拳动漫"
+    },
+    "malimali": {
+      "api": "https://malimali3.com/api.php/provide/vod",
+      "name": "嘛哩嘛哩"
+    },
+    "yingshijie": {
+      "api": "https://video.yingworld.vip/api.php/provide/vod",
+      "name": "影世界"
+    },
+    "zy1080": {
+      "api": "https://api.1080zyku.com/inc/api_mac10.php",
+      "name": "1080资源"
     }
   },
   "SiteConfig": {
