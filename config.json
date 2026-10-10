@@ -55,3 +55,6 @@
   },
   "SiteConfig": {
     "DoubanProxy": "https://www.xiaoxu.online/api/proxy?url=",
+    "ImageProxy": "https://www.xiaoxu.online/api/proxy?url="
+  }
+}
