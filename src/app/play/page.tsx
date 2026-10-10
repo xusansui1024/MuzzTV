@@ -101,7 +101,6 @@ function PlayPageClient() {
 
   // 搜索所需信息
   const [searchTitle] = useState(searchParams.get('stitle') || '');
-  const [searchType] = useState(searchParams.get('stype') || '');
 
   // 是否需要优选
   const [needPrefer, setNeedPrefer] = useState(
@@ -570,14 +569,11 @@ function PlayPageClient() {
         // 处理搜索结果，根据规则过滤
         // 标题用归一化匹配（容忍[电影解说]/普通话版/日文副标题等后缀），
         // 年份不作硬过滤（源站年份常标错，如《千与千寻》2001 被标为 2019，过滤会把能播的源排除）
+        // 电影/剧集不作硬过滤：多音轨（国语/日语）会被解析成多个"集数"，导致电影被误判为剧集而漏掉可播源
         const results = data.results.filter(
           (result: SearchResult) =>
             normalizeTitle(result.title) ===
-              normalizeTitle(videoTitleRef.current) &&
-            (searchType
-              ? (searchType === 'tv' && result.episodes.length > 1) ||
-                (searchType === 'movie' && result.episodes.length === 1)
-              : true)
+            normalizeTitle(videoTitleRef.current)
         );
         setAvailableSources(results);
         return results;
