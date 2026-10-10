@@ -93,18 +93,6 @@
       "detail": "https://www.hongniuzy3.com"
     }
   },
-  "custom_category": [
-    {
-      "name": "日本动画",
-      "type": "tv",
-      "query": "日本动画"
-    },
-    {
-      "name": "日本",
-      "type": "movie",
-      "query": "日本"
-    }
-  ],
   "SiteConfig": {
     "DoubanProxy": "https://www.xiaoxu.online/api/proxy?url=",
     "ImageProxy": "https://www.xiaoxu.online/api/proxy?url="
