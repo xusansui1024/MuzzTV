@@ -92,6 +92,14 @@
     "guangsu": {
       "api": "https://gszy.cc/api.php/provide/vod",
       "name": "光速资源"
+    },
+    "tiankong": {
+      "api": "https://api.tiankongapi.com/api.php/provide/vod",
+      "name": "天空资源"
+    },
+    "feisu": {
+      "api": "https://suizzy.cc/api.php/provide/vod",
+      "name": "飞速资源"
     }
   },
   "SiteConfig": {
