@@ -127,28 +127,33 @@ function DoubanPageClient() {
             '我的会长男友',
           ];
           const pg = Math.floor(pageStart / 25) + 1;
+          // 每个关键词独立容错：单个失败（接口超时/网络错误）只跳过该词，不拖垮整个分类
           const results = await Promise.all(
             keywords.map(async (kw) => {
-              const data = await fetch(
-                `/api/search?q=${encodeURIComponent(kw)}&pg=${pg}`
-              ).then((r) => r.json());
-              const nq = normalizeTitle(kw);
-              return (
-                (data.results || data.list || []) as Array<
-                  Record<string, unknown>
-                >
-              )
-                .filter((it) => {
-                  const t = String(it.title || it.name || '');
-                  return nq && normalizeTitle(t).includes(nq);
-                })
-                .map((it) => ({
-                  id: String(it.id || ''),
-                  title: String(it.title || it.name || ''),
-                  poster: String(it.poster || it.pic || ''),
-                  rate: '',
-                  year: String(it.year || ''),
-                }));
+              try {
+                const data = await fetch(
+                  `/api/search?q=${encodeURIComponent(kw)}&pg=${pg}`
+                ).then((r) => r.json());
+                const nq = normalizeTitle(kw);
+                return (
+                  (data.results || data.list || []) as Array<
+                    Record<string, unknown>
+                  >
+                )
+                  .filter((it) => {
+                    const t = String(it.title || it.name || '');
+                    return nq && normalizeTitle(t).includes(nq);
+                  })
+                  .map((it) => ({
+                    id: String(it.id || ''),
+                    title: String(it.title || it.name || ''),
+                    poster: String(it.poster || it.pic || ''),
+                    rate: '',
+                    year: String(it.year || ''),
+                  }));
+              } catch {
+                return [];
+              }
             })
           );
           rawList = results.flat();
@@ -264,6 +269,8 @@ function DoubanPageClient() {
         setHasMore(rawList.length > 0);
       } catch (err) {
         console.error('加载数据出错:', err);
+        // 首次加载失败时清空旧数据：避免切换分类后仍显示上一个分类的内容（看起来像"没反应"）
+        if (!isMore) setDoubanData([]);
         setHasMore(false);
       } finally {
         if (isMore) setIsLoadingMore(false);
