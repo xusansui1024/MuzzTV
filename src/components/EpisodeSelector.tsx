@@ -20,6 +20,26 @@ interface VideoInfo {
   hasError?: boolean; // 添加错误状态标识
 }
 
+// 画质优先级：数值越大越优先（用于换源排序）
+const qualityRank = (quality: string | undefined): number => {
+  switch (quality) {
+    case '4K':
+      return 6;
+    case '2K':
+      return 5;
+    case '1080p':
+      return 4;
+    case '720p':
+      return 3;
+    case '480p':
+      return 2;
+    case 'SD':
+      return 1;
+    default:
+      return 0; // 未知/其他画质
+  }
+};
+
 interface EpisodeSelectorProps {
   /** 总集数 */
   totalEpisodes: number;
@@ -215,7 +235,8 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
     // 依赖项保持与之前一致
   }, [activeTab, availableSources, getVideoInfo, optimizationEnabled]);
 
-  // 换源列表排序：当前播放源始终最前；其余固定按延迟从低到高（快→慢）排列。
+  // 换源列表排序：当前播放源始终最前；其余依次按
+  // ①可播放（测速成功）优先 ②画质高优先（1080p>720p）③延迟低优先（快→慢）排列。
   // 依赖 videoInfoMap，测速数据到达后列表会自动重排
   const sortedSources = useMemo(() => {
     const list = [...availableSources];
@@ -229,9 +250,20 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
       if (aIsCurrent && !bIsCurrent) return -1;
       if (!aIsCurrent && bIsCurrent) return 1;
 
-      // 延迟：无测速数据的排最后，其余按 ms 从小到大（快→慢）
       const aInfo = videoInfoMap.get(`${a.source}-${a.id}`);
       const bInfo = videoInfoMap.get(`${b.source}-${b.id}`);
+
+      // ① 可播放性：测速成功（无错误）的排前面，未测速/失败的排后面
+      const aPlayable = aInfo && !aInfo.hasError ? 1 : 0;
+      const bPlayable = bInfo && !bInfo.hasError ? 1 : 0;
+      if (aPlayable !== bPlayable) return bPlayable - aPlayable;
+
+      // ② 画质：高画质优先（4K>2K>1080p>720p>480p>SD>未知）
+      const aQ = aInfo ? qualityRank(aInfo.quality) : 0;
+      const bQ = bInfo ? qualityRank(bInfo.quality) : 0;
+      if (aQ !== bQ) return bQ - aQ;
+
+      // ③ 延迟：无测速数据的排最后，其余按 ms 从小到大（快→慢）
       const aPing = aInfo && !aInfo.hasError ? aInfo.pingTime : -1;
       const bPing = bInfo && !bInfo.hasError ? bInfo.pingTime : -1;
       if (aPing < 0 && bPing < 0) return 0;
