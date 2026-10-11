@@ -16,7 +16,7 @@ export async function normalizeEpisodeUrl(url: string): Promise<string> {
   const candidate = url.replace(/\/+$/, '') + '/index.m3u8';
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6000);
+    const timeoutId = setTimeout(() => controller.abort(), 2500);
     const response = await fetch(candidate, {
       headers: {
         'User-Agent':
@@ -61,7 +61,21 @@ export async function parseAndNormalizePlayUrls(
       }
     }
     if (urls.length > 0) {
-      const normalized = await Promise.all(urls.map(normalizeEpisodeUrl));
+      // 性能优化：同一播放源的多集地址通常在同一 CDN/壳页，
+      // 只对第一个非直链地址做网络验证，其余按相同规则补全，避免几百个串行验证拖垮搜索
+      const firstCandidate = urls.find((u) => !DIRECT_VIDEO_RE.test(u));
+      let verified = '';
+      if (firstCandidate) {
+        verified = await normalizeEpisodeUrl(firstCandidate);
+      }
+      const normalized = urls.map((u) => {
+        if (DIRECT_VIDEO_RE.test(u)) return u;
+        // 壳页地址：验证成功 → 补全 index.m3u8；失败 → 保留原地址
+        if (verified && verified !== firstCandidate) {
+          return u.replace(/\/+$/, '') + '/index.m3u8';
+        }
+        return u;
+      });
       normalizedBySource.push(Array.from(new Set(normalized)));
     }
   }

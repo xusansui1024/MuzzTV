@@ -226,16 +226,32 @@ function SearchPageClient() {
       const aliases = QUERY_ALIASES[normalizeTitle(trimmedQuery)] || [];
       const terms = [trimmedQuery, ...aliases];
 
+      // 20 秒超时：冷缓存时源站可能较慢，超时后进入结果视图并提示，而不是停留在搜索历史
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 20000);
+
       const responses = await Promise.all(
         terms.map((t) =>
-          fetch(`/api/search?q=${encodeURIComponent(t)}`).then((r) => r.json())
+          fetch(`/api/search?q=${encodeURIComponent(t)}`, {
+            signal: controller.signal,
+          }).then(async (r) => {
+            // 非 200（如 401/500/超时）视为空结果，不让 json 解析失败拖垮整个搜索
+            if (!r.ok) return { results: [] };
+            try {
+              return await r.json();
+            } catch {
+              return { results: [] };
+            }
+          })
         )
       );
+      clearTimeout(timeoutId);
 
       // 各词独立过滤：主词结果按主词过滤，别名词结果按别名词过滤
       const filteredByTerm = responses.map((data, i) => {
         const nq = normalizeTitle(terms[i]);
-        return (data.results as SearchResult[]).filter(
+        const items: SearchResult[] = (data && data.results) || [];
+        return items.filter(
           (result) => !nq || normalizeTitle(result.title).includes(nq)
         );
       });
@@ -288,7 +304,9 @@ function SearchPageClient() {
 
       setShowResults(true);
     } catch (error) {
+      // 超时/异常：也进入结果视图，显示"未找到相关结果"提示，而不是停留在搜索历史
       setSearchResults([]);
+      setShowResults(true);
     } finally {
       setIsLoading(false);
     }
