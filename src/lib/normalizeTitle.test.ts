@@ -35,6 +35,13 @@ describe('normalizeTitle', () => {
     expect(normalizeTitle('千与千寻：神隐少女')).toBe('千与千寻神隐少女');
   });
 
+  it('繁体转简体（千與千尋 → 千与千寻）', () => {
+    expect(normalizeTitle('千與千尋')).toBe('千与千寻');
+    expect(normalizeTitle('千與千尋[電影解說]')).toBe('千与千寻');
+    expect(normalizeTitle('黑幫少爺愛上我')).toBe('黑帮少爷爱上我');
+    expect(normalizeTitle('以你的心詮釋我的愛')).toBe('以你的心诠释我的爱');
+  });
+
   it('空输入安全', () => {
     expect(normalizeTitle('')).toBe('');
     expect(normalizeTitle('  ')).toBe('');

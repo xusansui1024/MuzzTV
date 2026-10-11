@@ -2,9 +2,12 @@
  * 标题归一化：把同一部影片的不同命名（括号后缀、版本词、日文副标题、空白差异等）
  * 归一成统一的分组键，供聚合搜索合并重复结果使用。
  */
+import { t2s } from './zhConvert';
+
 export function normalizeTitle(raw: string): string {
   if (!raw) return '';
-  let t = raw.trim();
+  // 0. 繁体转简体：源站标题以简体为主，繁体输入也能匹配（千與千尋 → 千与千寻）
+  let t = t2s(raw).trim();
 
   // 1. 去除括号及其内容（中文/英文/方括号）
   t = t.replace(/[（【[(][^）】)\]]*[）】)\]]/g, '');

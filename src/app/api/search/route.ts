@@ -2,12 +2,14 @@ import { NextResponse } from 'next/server';
 
 import { getAvailableApiSites, getCacheTime } from '@/lib/config';
 import { searchFromApi } from '@/lib/downstream';
+import { t2s } from '@/lib/zhConvert';
 
 export const runtime = 'edge';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const query = searchParams.get('q');
+  // 繁体转简体：源站库标题以简体为主，繁体输入（千與千尋）也能命中
+  const query = t2s(searchParams.get('q') || '');
 
   if (!query) {
     const cacheTime = await getCacheTime();
