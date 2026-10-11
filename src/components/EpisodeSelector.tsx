@@ -20,6 +20,20 @@ interface VideoInfo {
   hasError?: boolean; // 添加错误状态标识
 }
 
+// 解析速度字符串为 KB/s（"1.9 MB/s" → 1945.6），无法解析返回 -1
+const parseSpeedKBps = (loadSpeed: string | undefined): number => {
+  if (!loadSpeed || loadSpeed === '未知' || loadSpeed === '测量中...') {
+    return -1;
+  }
+  const match = loadSpeed.match(/^([\d.]+)\s*(KB\/s|MB\/s)$/);
+  if (!match) return -1;
+  const value = parseFloat(match[1]);
+  return match[2] === 'MB/s' ? value * 1024 : value;
+};
+
+// 换源列表排序模式
+type SourceSortMode = 'ping' | 'speed' | 'default';
+
 interface EpisodeSelectorProps {
   /** 总集数 */
   totalEpisodes: number;
@@ -69,6 +83,9 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
   const [attemptedSources, setAttemptedSources] = useState<Set<string>>(
     new Set()
   );
+
+  // 换源列表排序模式：默认按延迟从低到高（快→慢）
+  const [sourceSortMode, setSourceSortMode] = useState<SourceSortMode>('ping');
 
   // 使用 ref 来避免闭包问题
   const attemptedSourcesRef = useRef<Set<string>>(new Set());
@@ -214,6 +231,55 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
     fetchVideoInfosInBatches();
     // 依赖项保持与之前一致
   }, [activeTab, availableSources, getVideoInfo, optimizationEnabled]);
+
+  // 换源列表排序：当前播放源始终最前；其余按所选模式（延迟低→高 / 速度快→慢 / 默认原序）排列。
+  // 依赖 videoInfoMap，测速数据到达后列表会自动重排
+  const sortedSources = useMemo(() => {
+    const list = [...availableSources];
+    list.sort((a, b) => {
+      const aIsCurrent =
+        a.source?.toString() === currentSource?.toString() &&
+        a.id?.toString() === currentId?.toString();
+      const bIsCurrent =
+        b.source?.toString() === currentSource?.toString() &&
+        b.id?.toString() === currentId?.toString();
+      if (aIsCurrent && !bIsCurrent) return -1;
+      if (!aIsCurrent && bIsCurrent) return 1;
+
+      if (sourceSortMode === 'ping' || sourceSortMode === 'speed') {
+        const aInfo = videoInfoMap.get(`${a.source}-${a.id}`);
+        const bInfo = videoInfoMap.get(`${b.source}-${b.id}`);
+
+        if (sourceSortMode === 'ping') {
+          // 延迟：无测速数据的排最后，其余按 ms 从小到大（快→慢）
+          const aPing = aInfo && !aInfo.hasError ? aInfo.pingTime : -1;
+          const bPing = bInfo && !bInfo.hasError ? bInfo.pingTime : -1;
+          if (aPing < 0 && bPing < 0) return 0;
+          if (aPing < 0) return 1;
+          if (bPing < 0) return -1;
+          return aPing - bPing;
+        }
+
+        // 速度：无测速数据的排最后，其余按 KB/s 从大到小（快→慢）
+        const aSpeed =
+          aInfo && !aInfo.hasError ? parseSpeedKBps(aInfo.loadSpeed) : -1;
+        const bSpeed =
+          bInfo && !bInfo.hasError ? parseSpeedKBps(bInfo.loadSpeed) : -1;
+        if (aSpeed < 0 && bSpeed < 0) return 0;
+        if (aSpeed < 0) return 1;
+        if (bSpeed < 0) return -1;
+        return bSpeed - aSpeed;
+      }
+      return 0;
+    });
+    return list;
+  }, [
+    availableSources,
+    currentSource,
+    currentId,
+    sourceSortMode,
+    videoInfoMap,
+  ]);
 
   // 升序分页标签
   const categoriesAsc = useMemo(() => {
@@ -458,20 +524,35 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
           {!sourceSearchLoading &&
             !sourceSearchError &&
             availableSources.length > 0 && (
-              <div className='flex-1 overflow-y-auto space-y-2 pb-20'>
-                {availableSources
-                  .sort((a, b) => {
-                    const aIsCurrent =
-                      a.source?.toString() === currentSource?.toString() &&
-                      a.id?.toString() === currentId?.toString();
-                    const bIsCurrent =
-                      b.source?.toString() === currentSource?.toString() &&
-                      b.id?.toString() === currentId?.toString();
-                    if (aIsCurrent && !bIsCurrent) return -1;
-                    if (!aIsCurrent && bIsCurrent) return 1;
-                    return 0;
-                  })
-                  .map((source, index) => {
+              <div className='flex flex-col min-h-0 flex-1'>
+                {/* 排序切换按钮：延迟（快→慢）/ 速度（快→慢）/ 默认 */}
+                <div className='flex items-center gap-2 mb-2 flex-shrink-0 px-1'>
+                  <span className='text-xs text-gray-500 dark:text-gray-400'>
+                    排序:
+                  </span>
+                  {(
+                    [
+                      { mode: 'ping', label: '延迟↑(快→慢)' },
+                      { mode: 'speed', label: '速度↓(快→慢)' },
+                      { mode: 'default', label: '默认' },
+                    ] as { mode: SourceSortMode; label: string }[]
+                  ).map((item) => (
+                    <button
+                      key={item.mode}
+                      onClick={() => setSourceSortMode(item.mode)}
+                      className={`px-2 py-1 rounded-md text-xs transition-colors ${
+                        sourceSortMode === item.mode
+                          ? 'bg-green-500/15 text-green-600 dark:text-green-400 border border-green-500/30'
+                          : 'text-gray-600 dark:text-gray-300 hover:bg-gray-200/50 dark:hover:bg-white/10 border border-transparent'
+                      }`.trim()}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className='flex-1 overflow-y-auto space-y-2 pb-20'>
+                  {sortedSources.map((source, index) => {
                     const isCurrentSource =
                       source.source?.toString() === currentSource?.toString() &&
                       source.id?.toString() === currentId?.toString();
@@ -601,19 +682,20 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
                       </div>
                     );
                   })}
-                <div className='flex-shrink-0 mt-auto pt-2 border-t border-gray-400 dark:border-gray-700'>
-                  <button
-                    onClick={() => {
-                      if (videoTitle) {
-                        router.push(
-                          `/search?q=${encodeURIComponent(videoTitle)}`
-                        );
-                      }
-                    }}
-                    className='w-full text-center text-xs text-gray-500 dark:text-gray-400 hover:text-green-500 dark:hover:text-green-400 transition-colors py-2'
-                  >
-                    影片匹配有误？点击去搜索
-                  </button>
+                  <div className='flex-shrink-0 mt-auto pt-2 border-t border-gray-400 dark:border-gray-700'>
+                    <button
+                      onClick={() => {
+                        if (videoTitle) {
+                          router.push(
+                            `/search?q=${encodeURIComponent(videoTitle)}`
+                          );
+                        }
+                      }}
+                      className='w-full text-center text-xs text-gray-500 dark:text-gray-400 hover:text-green-500 dark:hover:text-green-400 transition-colors py-2'
+                    >
+                      影片匹配有误？点击去搜索
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
