@@ -19,6 +19,12 @@ import { SearchResult } from '@/lib/types';
 import PageLayout from '@/components/PageLayout';
 import VideoCard from '@/components/VideoCard';
 
+// 别名映射：部分节目/剧改名后，搜旧名时并行搜新名，避免漏掉新一季。
+// key 为 normalizeTitle 后的旧名，value 为要追加搜索的新名列表。
+const QUERY_ALIASES: Record<string, string[]> = {
+  中国新说唱: ['新说唱'],
+};
+
 function SearchPageClient() {
   // 搜索历史
 
@@ -66,12 +72,11 @@ function SearchPageClient() {
     searchResults.forEach((item) => {
       // 分组键仅使用归一化标题：同一部片的不同命名/年份/类型
       // （如年份被源站标错、[电影解说]、普通话版、日文副标题）合并为一组
-      // 再剥除"第X季"后缀：让"中国新说唱2024"与"中国新说唱第一季"等
-      // 各季合并为同一部剧一张卡，点开后可选择具体季/版本
-      const key = normalizeTitle(item.title).replace(
-        /第[一二三四五六七八九十百\d]+季$/,
-        ''
-      );
+      // 再剥除"第X季"后缀和"中国"前缀：让"中国新说唱2024"与"新说唱2025"
+      // 等各季/改名版本合并为同一部剧一张卡，点开后可选择具体季/版本
+      const key = normalizeTitle(item.title)
+        .replace(/第[一二三四五六七八九十百\d]+季$/, '')
+        .replace(/^中国/, '');
 
       const arr = map.get(key) || [];
 
@@ -215,24 +220,40 @@ function SearchPageClient() {
     try {
       setIsLoading(true);
 
-      const response = await fetch(
-        `/api/search?q=${encodeURIComponent(query.trim())}`
+      const trimmedQuery = query.trim();
+      // 别名扩展：部分节目改名后（如《中国新说唱》2025 季改名《新说唱》），
+      // 搜旧名时并行搜新名，避免漏掉新一季
+      const aliases = QUERY_ALIASES[normalizeTitle(trimmedQuery)] || [];
+      const terms = [trimmedQuery, ...aliases];
+
+      const responses = await Promise.all(
+        terms.map((t) =>
+          fetch(`/api/search?q=${encodeURIComponent(t)}`).then((r) => r.json())
+        )
       );
 
-      const data = await response.json();
+      // 各词独立过滤：主词结果按主词过滤，别名词结果按别名词过滤
+      const filteredByTerm = responses.map((data, i) => {
+        const nq = normalizeTitle(terms[i]);
+        return (data.results as SearchResult[]).filter(
+          (result) => !nq || normalizeTitle(result.title).includes(nq)
+        );
+      });
 
-      // 过滤：仅保留标题包含搜索词的结果。
-      // 部分源站（如量子/暴风）搜索接口会返回无关结果（热门列表/模糊匹配），
-      // 归一化后做包含匹配可剔除；去标点后"哈利·波特"仍能匹配"哈利波特"。
-      const normalizedQuery = normalizeTitle(query.trim());
-      const filteredResults = (data.results as SearchResult[]).filter(
-        (result) =>
-          !normalizedQuery ||
-          normalizeTitle(result.title).includes(normalizedQuery)
+      // 合并：别名词结果只补充主词结果里没有的条目（如同名不同季）
+      const [mainFiltered, ...aliasFiltered] = filteredByTerm;
+      const mainKeys = new Set(
+        mainFiltered.map((it) => `${it.title}|${it.year || ''}`)
       );
+      const mergedResults = [
+        ...mainFiltered,
+        ...aliasFiltered
+          .flat()
+          .filter((it) => !mainKeys.has(`${it.title}|${it.year || ''}`)),
+      ];
 
       setSearchResults(
-        filteredResults.sort((a: SearchResult, b: SearchResult) => {
+        mergedResults.sort((a: SearchResult, b: SearchResult) => {
           // 优先排序：标题与搜索词完全一致的排在前面
 
           const aExactMatch = a.title === query.trim();
