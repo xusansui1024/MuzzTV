@@ -10,12 +10,17 @@ export async function middleware(request: NextRequest) {
   // 💡 新增这两行：获取并打印访客的真实 IP
   const ip = request.headers.get('x-forwarded-for') || request.ip || '未知 IP';
   console.log(`[实时监控] 路径: ${pathname} | 访客 IP: ${ip}`);
-  
-  // 💡 新增/修改：把 proxy 和 douban 相关的接口全部加入白名单
-  if (pathname.startsWith('/api/proxy') || pathname.startsWith('/api/douban')) {
+
+  // 💡 新增/修改：把 proxy / douban / search 相关的接口全部加入白名单
+  // search 为公开聚合搜索（多源站聚合结果，无用户私有数据），无需登录即可搜索
+  if (
+    pathname.startsWith('/api/proxy') ||
+    pathname.startsWith('/api/douban') ||
+    pathname.startsWith('/api/search')
+  ) {
     return NextResponse.next();
   }
-  
+
   // 跳过不需要认证的路径
   if (shouldSkipAuth(pathname)) {
     return NextResponse.next();
