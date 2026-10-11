@@ -66,7 +66,12 @@ function SearchPageClient() {
     searchResults.forEach((item) => {
       // 分组键仅使用归一化标题：同一部片的不同命名/年份/类型
       // （如年份被源站标错、[电影解说]、普通话版、日文副标题）合并为一组
-      const key = normalizeTitle(item.title);
+      // 再剥除"第X季"后缀：让"中国新说唱2024"与"中国新说唱第一季"等
+      // 各季合并为同一部剧一张卡，点开后可选择具体季/版本
+      const key = normalizeTitle(item.title).replace(
+        /第[一二三四五六七八九十百\d]+季$/,
+        ''
+      );
 
       const arr = map.get(key) || [];
 
