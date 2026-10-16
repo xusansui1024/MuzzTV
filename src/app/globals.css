@@ -174,3 +174,36 @@ div[data-media-provider] video {
     display: none !important;
   }
 }
+
+/* ===== 电视模式（TV 遥控器适配） ===== */
+.tv-mode {
+  cursor: none;
+}
+
+/* 遥控焦点高亮（不使用 scale，避免改变布局位置干扰导航计算） */
+.tv-mode .tv-focused {
+  outline: 3px solid #38bdf8 !important;
+  outline-offset: 3px;
+  border-radius: 0.75rem;
+  box-shadow: 0 0 0 6px rgba(56, 189, 248, 0.25), 0 12px 30px rgba(0, 0, 0, 0.6) !important;
+  position: relative;
+  z-index: 30;
+}
+
+/* 播放器聚焦时恢复系统焦点样式，避免覆盖控制条 */
+.tv-mode video.tv-focused {
+  outline: none !important;
+  transform: none;
+  box-shadow: none !important;
+}
+
+/* TV 大屏基础字号 */
+.tv-mode {
+  font-size: 16px;
+}
+
+@media (min-width: 1600px) {
+  .tv-mode {
+    font-size: 18px;
+  }
+}

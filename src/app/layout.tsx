@@ -11,6 +11,7 @@ import RuntimeConfig from '@/lib/runtime';
 
 import { SiteProvider } from '@/components/SiteProvider';
 import { ThemeProvider } from '@/components/ThemeProvider';
+import TvNavigation from '@/components/TvNavigation';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -113,6 +114,7 @@ export default async function RootLayout({
           <SiteProvider siteName={siteName} announcement={announcement}>
             {children}
           </SiteProvider>
+          <TvNavigation />
         </ThemeProvider>
       </body>
     </html>
