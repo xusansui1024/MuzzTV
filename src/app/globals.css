@@ -207,3 +207,21 @@ div[data-media-provider] video {
     font-size: 18px;
   }
 }
+
+/* TV 模式强制桌面布局：侧边栏分类常驻左侧、隐藏移动端底部导航，
+   避免低分辨率电视（视口 < 768px）退化成手机布局 */
+.tv-mode [class~='md\:block'] {
+  display: block !important;
+}
+
+.tv-mode [class~='md\:flex'] {
+  display: flex !important;
+}
+
+.tv-mode [class~='md\:hidden'] {
+  display: none !important;
+}
+
+.tv-mode .md\:grid {
+  grid-template-columns: auto 1fr !important;
+}
