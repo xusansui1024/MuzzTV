@@ -82,6 +82,14 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
   const router = useRouter();
   const pageCount = Math.ceil(totalEpisodes / episodesPerPage);
 
+  // 是否大陆用户（middleware 注入的 x-country cookie：CN=中国大陆）
+  // 大陆用户优先使用 360资源（独立 IP 直连，不套 Cloudflare，大陆访问稳定）
+  const [isCNUser, setIsCNUser] = useState(false);
+  useEffect(() => {
+    const m = document.cookie.match(/(?:^|;\s*)x-country=([^;]+)/);
+    setIsCNUser(m ? m[1] === 'CN' : false);
+  }, []);
+
   // 存储每个源的视频信息
   const [videoInfoMap, setVideoInfoMap] = useState<Map<string, VideoInfo>>(
     new Map()
@@ -235,8 +243,8 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
     // 依赖项保持与之前一致
   }, [activeTab, availableSources, getVideoInfo, optimizationEnabled]);
 
-  // 换源列表排序：当前播放源始终最前；其余依次按
-  // ①可播放（测速成功）优先 ②画质高优先（1080p>720p）③延迟低优先（快→慢）排列。
+  // 换源列表排序：当前播放源始终最前；大陆用户 360资源其次（直连稳定）；
+  // 其余依次按 ①可播放（测速成功）优先 ②画质高优先（1080p>720p）③延迟低优先（快→慢）排列。
   // 依赖 videoInfoMap，测速数据到达后列表会自动重排
   const sortedSources = useMemo(() => {
     const list = [...availableSources];
@@ -249,6 +257,13 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
         b.id?.toString() === currentId?.toString();
       if (aIsCurrent && !bIsCurrent) return -1;
       if (!aIsCurrent && bIsCurrent) return 1;
+
+      // 大陆用户：360资源（zy360）固定优先于其他源（独立 IP 直连，大陆访问稳定）
+      if (isCNUser) {
+        const aPref = a.source?.toString() === 'zy360' ? 1 : 0;
+        const bPref = b.source?.toString() === 'zy360' ? 1 : 0;
+        if (aPref !== bPref) return bPref - aPref;
+      }
 
       const aInfo = videoInfoMap.get(`${a.source}-${a.id}`);
       const bInfo = videoInfoMap.get(`${b.source}-${b.id}`);
@@ -272,7 +287,7 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
       return aPing - bPing;
     });
     return list;
-  }, [availableSources, currentSource, currentId, videoInfoMap]);
+  }, [availableSources, currentSource, currentId, videoInfoMap, isCNUser]);
 
   // 升序分页标签
   const categoriesAsc = useMemo(() => {

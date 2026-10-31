@@ -11,6 +11,22 @@ export async function middleware(request: NextRequest) {
   const ip = request.headers.get('x-forwarded-for') || request.ip || '未知 IP';
   console.log(`[实时监控] 路径: ${pathname} | 访客 IP: ${ip}`);
 
+  // Vercel 自动注入的国家代码（CN=中国大陆, TW=台湾, HK=香港, US=美国...）
+  const country = request.headers.get('x-vercel-ip-country') || '';
+
+  // 给 next() 响应附加国家 cookie（供前端判断是否大陆用户，如换源优先级）
+  const withCountryCookie = (response: NextResponse): NextResponse => {
+    if (country) {
+      response.cookies.set('x-country', country, {
+        httpOnly: false,
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 60 * 60 * 24 * 30,
+      });
+    }
+    return response;
+  };
+
   // 💡 新增/修改：把 proxy / douban / search 相关的接口全部加入白名单
   // search 为公开聚合搜索（多源站聚合结果，无用户私有数据），无需登录即可搜索
   if (
@@ -18,12 +34,12 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api/douban') ||
     pathname.startsWith('/api/search')
   ) {
-    return NextResponse.next();
+    return withCountryCookie(NextResponse.next());
   }
 
   // 跳过不需要认证的路径
   if (shouldSkipAuth(pathname)) {
-    return NextResponse.next();
+    return withCountryCookie(NextResponse.next());
   }
 
   const storageType = process.env.NEXT_PUBLIC_STORAGE_TYPE || 'localstorage';
@@ -46,7 +62,7 @@ export async function middleware(request: NextRequest) {
     if (!authInfo.password || authInfo.password !== process.env.PASSWORD) {
       return handleAuthFailure(request, pathname);
     }
-    return NextResponse.next();
+    return withCountryCookie(NextResponse.next());
   }
 
   // 其他模式：只验证签名
@@ -65,7 +81,7 @@ export async function middleware(request: NextRequest) {
 
     // 签名验证通过即可
     if (isValidSignature) {
-      return NextResponse.next();
+      return withCountryCookie(NextResponse.next());
     }
   }
 

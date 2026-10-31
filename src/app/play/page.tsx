@@ -39,6 +39,14 @@ function PlayPageClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  // 是否大陆用户（middleware 注入的 x-country cookie：CN=中国大陆）
+  // 大陆用户自动优先选择 360资源（独立 IP 直连，不套 Cloudflare，大陆访问稳定）
+  const [isCNUser, setIsCNUser] = useState(false);
+  useEffect(() => {
+    const m = document.cookie.match(/(?:^|;\s*)x-country=([^;]+)/);
+    setIsCNUser(m ? m[1] === 'CN' : false);
+  }, []);
+
   // -----------------------------------------------------------------------------
   // 状态变量（State）
   // -----------------------------------------------------------------------------
@@ -312,6 +320,18 @@ function PlayPageClient() {
 
     // 按综合评分排序，选择最佳播放源
     resultsWithScore.sort((a, b) => b.score - a.score);
+
+    // 大陆用户：360资源（zy360）测速成功时强制优先选它（独立 IP 直连，大陆访问稳定）
+    if (isCNUser) {
+      const idx = resultsWithScore.findIndex(
+        (r) => r.source.source === 'zy360' && !r.testResult.hasError
+      );
+      if (idx > 0) {
+        const [picked] = resultsWithScore.splice(idx, 1);
+        resultsWithScore.unshift(picked);
+        console.log(`[大陆用户] 360资源提至首选（原位置 ${idx + 1}）`);
+      }
+    }
 
     console.log('播放源评分排序结果:');
     resultsWithScore.forEach((result, index) => {
