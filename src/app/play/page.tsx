@@ -197,6 +197,11 @@ function PlayPageClient() {
 
   // 播放进度保存相关
   const saveIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // 自动切源相关：加载超时自动切到下一个可播放源
+  const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const autoSwitchTriedRef = useRef<Set<string>>(new Set());
+  const hasStartedPlayingRef = useRef(false);
   const lastSaveTimeRef = useRef<number>(0);
 
   const artPlayerRef = useRef<any>(null);
@@ -834,6 +839,39 @@ function PlayPageClient() {
     }
   };
 
+  // 自动切到下一个可播放源（加载超时或播放失败时调用）
+  const autoSwitchToNextSource = () => {
+    const currentKey = `${currentSource}-${currentId}`;
+    autoSwitchTriedRef.current.add(currentKey);
+    console.log(
+      `[自动切源] 当前源 ${currentKey} 加载失败，已尝试:`,
+      Array.from(autoSwitchTriedRef.current)
+    );
+
+    // 找下一个可播放源（测速成功且未尝试过）
+    const next = availableSources.find((s) => {
+      const key = `${s.source}-${s.id}`;
+      if (key === currentKey) return false;
+      if (autoSwitchTriedRef.current.has(key)) return false;
+      // 优先选测速成功的（precomputedVideoInfo 里有且无 hasError）
+      const info = precomputedVideoInfo.get(key);
+      return info && !(info as any).hasError;
+    });
+
+    if (next) {
+      console.log(
+        `[自动切源] 切换到: ${next.source_name} (${next.source}-${next.id})`
+      );
+      artPlayerRef.current?.notice?.show?.(
+        `当前源加载失败，自动切换到 ${next.source_name}`
+      );
+      handleSourceChange(next.source, next.id, next.title);
+    } else {
+      console.warn('[自动切源] 没有更多可播放源了');
+      artPlayerRef.current?.notice?.show?.('所有源都加载失败，请手动选择');
+    }
+  };
+
   useEffect(() => {
     document.addEventListener('keydown', handleKeyboardShortcuts);
     return () => {
@@ -1468,6 +1506,19 @@ function PlayPageClient() {
         if (artPlayerRef.current.currentTime > 0) {
           return;
         }
+        // 刚开始播放就报错 → 自动切到下一个可播放源
+        console.log('[自动切源] 播放器报错，尝试切换');
+        setTimeout(() => autoSwitchToNextSource(), 500);
+      });
+
+      // 监听视频开始播放 → 清除加载超时定时器，重置自动切记录
+      artPlayerRef.current.on('video:playing', () => {
+        hasStartedPlayingRef.current = true;
+        autoSwitchTriedRef.current.clear();
+        if (loadTimeoutRef.current) {
+          clearTimeout(loadTimeoutRef.current);
+          loadTimeoutRef.current = null;
+        }
       });
 
       // 监听视频播放结束事件，自动播放下一集
@@ -1506,6 +1557,18 @@ function PlayPageClient() {
           videoUrl
         );
       }
+
+      // 启动加载超时检测：12 秒没开始播放就自动切源
+      hasStartedPlayingRef.current = false;
+      if (loadTimeoutRef.current) {
+        clearTimeout(loadTimeoutRef.current);
+      }
+      loadTimeoutRef.current = setTimeout(() => {
+        if (!hasStartedPlayingRef.current && !loading) {
+          console.log('[自动切源] 加载超时（12秒未播放），尝试切换');
+          autoSwitchToNextSource();
+        }
+      }, 12000);
     } catch (err) {
       console.error('创建播放器失败:', err);
       setError('播放器初始化失败');
