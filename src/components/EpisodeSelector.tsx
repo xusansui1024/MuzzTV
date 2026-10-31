@@ -243,12 +243,19 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
     // 依赖项保持与之前一致
   }, [activeTab, availableSources, getVideoInfo, optimizationEnabled]);
 
-  // 换源列表排序：当前播放源始终最前；大陆用户 360资源其次（直连稳定）；
-  // 其余依次按 ①可播放（测速成功）优先 ②画质高优先（1080p>720p）③延迟低优先（快→慢）排列。
+  // 换源列表排序：大陆用户 360资源永远最前（独立 IP 直连稳定）；
+  // 当前播放源其次；其余依次按 ①可播放（测速成功）优先 ②画质高优先 ③延迟低优先。
   // 依赖 videoInfoMap，测速数据到达后列表会自动重排
   const sortedSources = useMemo(() => {
     const list = [...availableSources];
     list.sort((a, b) => {
+      // 大陆用户：360资源（zy360）固定排最前
+      if (isCNUser) {
+        const aPref = a.source?.toString() === 'zy360' ? 1 : 0;
+        const bPref = b.source?.toString() === 'zy360' ? 1 : 0;
+        if (aPref !== bPref) return bPref - aPref;
+      }
+
       const aIsCurrent =
         a.source?.toString() === currentSource?.toString() &&
         a.id?.toString() === currentId?.toString();
@@ -257,13 +264,6 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
         b.id?.toString() === currentId?.toString();
       if (aIsCurrent && !bIsCurrent) return -1;
       if (!aIsCurrent && bIsCurrent) return 1;
-
-      // 大陆用户：360资源（zy360）固定优先于其他源（独立 IP 直连，大陆访问稳定）
-      if (isCNUser) {
-        const aPref = a.source?.toString() === 'zy360' ? 1 : 0;
-        const bPref = b.source?.toString() === 'zy360' ? 1 : 0;
-        if (aPref !== bPref) return bPref - aPref;
-      }
 
       const aInfo = videoInfoMap.get(`${a.source}-${a.id}`);
       const bInfo = videoInfoMap.get(`${b.source}-${b.id}`);
