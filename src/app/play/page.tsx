@@ -848,22 +848,36 @@ function PlayPageClient() {
       Array.from(autoSwitchTriedRef.current)
     );
 
-    // 找下一个可播放源（测速成功且未尝试过）
-    const next = availableSources.find((s) => {
-      const key = `${s.source}-${s.id}`;
-      if (key === currentKey) return false;
-      if (autoSwitchTriedRef.current.has(key)) return false;
-      // 优先选测速成功的（precomputedVideoInfo 里有且无 hasError）
-      const info = precomputedVideoInfo.get(key);
-      return info && !(info as any).hasError;
-    });
+    // 找所有测速成功且未尝试过的源，按延迟从低到高排序，选最快的
+    const candidates = availableSources
+      .filter((s) => {
+        const key = `${s.source}-${s.id}`;
+        if (key === currentKey) return false;
+        if (autoSwitchTriedRef.current.has(key)) return false;
+        const info = precomputedVideoInfo.get(key);
+        return info && !(info as any).hasError;
+      })
+      .map((s) => {
+        const info = precomputedVideoInfo.get(`${s.source}-${s.id}`);
+        return info ? { s, info } : null;
+      })
+      .filter(
+        (
+          x
+        ): x is {
+          s: SearchResult;
+          info: { quality: string; loadSpeed: string; pingTime: number };
+        } => x !== null
+      )
+      .sort((a, b) => a.info.pingTime - b.info.pingTime); // 延迟低的优先
 
-    if (next) {
+    if (candidates.length > 0) {
+      const next = candidates[0].s;
       console.log(
-        `[自动切源] 切换到: ${next.source_name} (${next.source}-${next.id})`
+        `[自动切源] 切换到测速最快的可播放源: ${next.source_name} (${next.source}-${next.id}, ${candidates[0].info.pingTime}ms)`
       );
       artPlayerRef.current?.notice?.show?.(
-        `当前源加载失败，自动切换到 ${next.source_name}`
+        `当前源加载失败，自动切换到 ${next.source_name}（最快可播放源）`
       );
       handleSourceChange(next.source, next.id, next.title);
     } else {
