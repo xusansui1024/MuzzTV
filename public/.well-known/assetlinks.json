@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.xiaoxu.moontv",
+      "sha256_cert_fingerprints": [
+        "6B:63:DB:0D:ED:46:E7:0E:53:47:77:76:F5:9A:65:A2:67:CF:7F:25:E6:B9:62:54:04:D7:4E:6E:71:D0:F6:60"
+      ]
+    }
+  }
+]
