@@ -278,12 +278,8 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
   }, [activeTab, availableSources, getVideoInfo, optimizationEnabled]);
 
   // 换源列表排序（2026-11-15 按使用要求重排）：
-  // ① 可播放（测速成功）永远第一，避免置顶源卡在加载中
-  // ② 正在播放的源在同档内置顶
-  // ③ 无广告优先（绿标 → 未知 → 含广告）
-  // ④ 画质优先，1080p 及以上排在 720p 前
-  // ⑤ 速度快的优先，无测速数据按延迟升序兜底
-  // ⑥ 大陆用户：360 资源在同等条件下优先（独立 IP 直连更稳）
+  // 大陆用户：360 资源固定置顶（大陆实测只有它确定可直连可播）
+  // 其他地区：可播放 → 正在播放 → 无广告 → 1080p 画质 → 速度 → 延迟
   const speedRank = (s?: string): number => {
     if (!s) return -1;
     const m = s.match(/([0-9.]+)\s*(KB|MB)\/s/i);
@@ -302,6 +298,13 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
   const sortedSources = useMemo(() => {
     const list = [...availableSources];
     list.sort((a, b) => {
+      // 大陆用户：360 资源固定置顶
+      if (isCNUser) {
+        const aPref = a.source?.toString() === 'zy360' ? 1 : 0;
+        const bPref = b.source?.toString() === 'zy360' ? 1 : 0;
+        if (aPref !== bPref) return bPref - aPref;
+      }
+
       const aInfo = videoInfoMap.get(`${a.source}-${a.id}`);
       const bInfo = videoInfoMap.get(`${b.source}-${b.id}`);
 
@@ -335,22 +338,13 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
       const bS = bInfo && !bInfo.hasError ? speedRank(bInfo.loadSpeed) : -1;
       if (aS !== bS) return bS - aS;
 
-      // ⑥ 延迟兜底
+      // ⑦ 延迟兜底
       const aPing = aInfo && !aInfo.hasError ? aInfo.pingTime : -1;
       const bPing = bInfo && !bInfo.hasError ? bInfo.pingTime : -1;
-      if (aPing !== bPing) {
-        if (aPing < 0) return 1;
-        if (bPing < 0) return -1;
-        return aPing - bPing;
-      }
-
-      // ⑦ 大陆用户：360 资源同档优先
-      if (isCNUser) {
-        const a360 = a.source?.toString() === 'zy360' ? 1 : 0;
-        const b360 = b.source?.toString() === 'zy360' ? 1 : 0;
-        if (a360 !== b360) return b360 - a360;
-      }
-      return 0;
+      if (aPing < 0 && bPing < 0) return 0;
+      if (aPing < 0) return 1;
+      if (bPing < 0) return -1;
+      return aPing - bPing;
     });
     return list;
   }, [availableSources, currentSource, currentId, videoInfoMap, isCNUser]);
