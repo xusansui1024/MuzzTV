@@ -645,38 +645,52 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
                             const sourceKey = `${source.source}-${source.id}`;
                             const videoInfo = videoInfoMap.get(sourceKey);
 
-                            if (videoInfo && videoInfo.quality !== '未知') {
-                              if (videoInfo.hasError) {
-                                return (
-                                  <div className='bg-gray-500/10 dark:bg-gray-400/20 text-red-600 dark:text-red-400 px-1.5 py-0 rounded text-xs flex-shrink-0 min-w-[50px] text-center'>
-                                    检测失败
-                                  </div>
-                                );
-                              } else {
-                                // 根据分辨率设置不同颜色：2K、4K为紫色，1080p、720p为绿色，其他为黄色
-                                const isUltraHigh = ['4K', '2K'].includes(
-                                  videoInfo.quality
-                                );
-                                const isHigh = ['1080p', '720p'].includes(
-                                  videoInfo.quality
-                                );
-                                const textColorClasses = isUltraHigh
-                                  ? 'text-purple-600 dark:text-purple-400'
-                                  : isHigh
-                                  ? 'text-green-600 dark:text-green-400'
-                                  : 'text-yellow-600 dark:text-yellow-400';
-
-                                return (
-                                  <div
-                                    className={`bg-gray-500/10 dark:bg-gray-400/20 ${textColorClasses} px-1.5 py-0 rounded text-xs flex-shrink-0 min-w-[50px] text-center`}
-                                  >
-                                    {videoInfo.quality}
-                                  </div>
-                                );
-                              }
+                            // 还没轮到测速：给个占位，避免右侧一片空白
+                            if (!videoInfo) {
+                              return (
+                                <div className='bg-gray-500/10 dark:bg-gray-400/20 text-gray-500 dark:text-gray-400 px-1.5 py-0 rounded text-xs flex-shrink-0 min-w-[50px] text-center'>
+                                  测速中
+                                </div>
+                              );
                             }
 
-                            return null;
+                            if (videoInfo.hasError) {
+                              return (
+                                <div className='bg-gray-500/10 dark:bg-gray-400/20 text-red-600 dark:text-red-400 px-1.5 py-0 rounded text-xs flex-shrink-0 min-w-[50px] text-center'>
+                                  检测失败
+                                </div>
+                              );
+                            }
+
+                            // 能播但解析不出具体分辨率时，明确标“可播”，不要留空白
+                            if (videoInfo.quality === '未知') {
+                              return (
+                                <div className='bg-gray-500/10 dark:bg-gray-400/20 text-gray-600 dark:text-gray-300 px-1.5 py-0 rounded text-xs flex-shrink-0 min-w-[50px] text-center'>
+                                  可播
+                                </div>
+                              );
+                            }
+
+                            // 根据分辨率设置不同颜色：2K、4K为紫色，1080p、720p为绿色，其他为黄色
+                            const isUltraHigh = ['4K', '2K'].includes(
+                              videoInfo.quality
+                            );
+                            const isHigh = ['1080p', '720p'].includes(
+                              videoInfo.quality
+                            );
+                            const textColorClasses = isUltraHigh
+                              ? 'text-purple-600 dark:text-purple-400'
+                              : isHigh
+                              ? 'text-green-600 dark:text-green-400'
+                              : 'text-yellow-600 dark:text-yellow-400';
+
+                            return (
+                              <div
+                                className={`bg-gray-500/10 dark:bg-gray-400/20 ${textColorClasses} px-1.5 py-0 rounded text-xs flex-shrink-0 min-w-[50px] text-center`}
+                              >
+                                {videoInfo.quality}
+                              </div>
+                            );
                           })()}
                         </div>
 
