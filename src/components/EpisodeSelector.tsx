@@ -50,6 +50,8 @@ const CLEAN_SOURCES = new Set([
   'feifan', // 非凡资源
   'ikun', // iKun资源
   'zuid', // 最大资源
+  'bdzy', // 百度资源
+  'maoyan', // 猫眼资源
 ]);
 // 含广告：画面烧录水印/跑马灯，或 m3u8 内插播广告分片
 const AD_SOURCES = new Set([
