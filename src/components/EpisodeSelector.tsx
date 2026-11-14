@@ -52,6 +52,8 @@ const CLEAN_SOURCES = new Set([
   'zuid', // 最大资源
   'bdzy', // 百度资源
   'maoyan', // 猫眼资源
+  'lzizy1', // 量子资源2：与量子同 CDN，4 点抽帧无赌博水印
+  'lovedan', // 乐丹资源：聚合站，本片干净（部分片走飘零 CDN 会带跑马灯）
 ]);
 // 含广告：画面烧录水印/跑马灯，或 m3u8 内插播广告分片
 const AD_SOURCES = new Set([
@@ -67,6 +69,9 @@ const AD_SOURCES = new Set([
   'mdzy', // 魔都资源：开元棋牌跑马灯
   'modudm', // 魔都动漫：同上
   'piaoling', // 飘零资源：天地壹号跑马灯
+  'uku', // U酷资源：开元 电子/彩票 跑马灯
+  'iqiyi', // 奇异资源：大发财棋牌 824387.com 横幅
+  'wujin', // 无尽资源：实为飘零同 CDN，天地壹号跑马灯
 ]);
 
 interface EpisodeSelectorProps {
@@ -272,19 +277,40 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
     // 依赖项保持与之前一致
   }, [activeTab, availableSources, getVideoInfo, optimizationEnabled]);
 
-  // 换源列表排序：大陆用户 360资源永远最前（独立 IP 直连稳定）；
-  // 当前播放源其次；其余依次按 ①可播放（测速成功）优先 ②画质高优先 ③延迟低优先。
-  // 依赖 videoInfoMap，测速数据到达后列表会自动重排
+  // 换源列表排序（2026-11-15 按使用要求重排）：
+  // ① 可播放（测速成功）永远第一，避免置顶源卡在加载中
+  // ② 正在播放的源在同档内置顶
+  // ③ 无广告优先（绿标 → 未知 → 含广告）
+  // ④ 画质优先，1080p 及以上排在 720p 前
+  // ⑤ 速度快的优先，无测速数据按延迟升序兜底
+  // ⑥ 大陆用户：360 资源在同等条件下优先（独立 IP 直连更稳）
+  const speedRank = (s?: string): number => {
+    if (!s) return -1;
+    const m = s.match(/([0-9.]+)\s*(KB|MB)\/s/i);
+    if (!m) return -1;
+    const v = parseFloat(m[1]);
+    return m[2].toUpperCase() === 'MB' ? v * 1024 : v;
+  };
+
+  const adRank = (key?: string): number => {
+    const k = key?.toString() || '';
+    if (CLEAN_SOURCES.has(k)) return 2;
+    if (AD_SOURCES.has(k)) return 0;
+    return 1;
+  };
+
   const sortedSources = useMemo(() => {
     const list = [...availableSources];
     list.sort((a, b) => {
-      // 大陆用户：360资源（zy360）固定排最前
-      if (isCNUser) {
-        const aPref = a.source?.toString() === 'zy360' ? 1 : 0;
-        const bPref = b.source?.toString() === 'zy360' ? 1 : 0;
-        if (aPref !== bPref) return bPref - aPref;
-      }
+      const aInfo = videoInfoMap.get(`${a.source}-${a.id}`);
+      const bInfo = videoInfoMap.get(`${b.source}-${b.id}`);
 
+      // ① 可播放优先
+      const aPlayable = aInfo && !aInfo.hasError ? 1 : 0;
+      const bPlayable = bInfo && !bInfo.hasError ? 1 : 0;
+      if (aPlayable !== bPlayable) return bPlayable - aPlayable;
+
+      // ② 当前播放源置顶
       const aIsCurrent =
         a.source?.toString() === currentSource?.toString() &&
         a.id?.toString() === currentId?.toString();
@@ -294,26 +320,37 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
       if (aIsCurrent && !bIsCurrent) return -1;
       if (!aIsCurrent && bIsCurrent) return 1;
 
-      const aInfo = videoInfoMap.get(`${a.source}-${a.id}`);
-      const bInfo = videoInfoMap.get(`${b.source}-${b.id}`);
+      // ③ 无广告优先
+      const aAd = adRank(a.source);
+      const bAd = adRank(b.source);
+      if (aAd !== bAd) return bAd - aAd;
 
-      // ① 可播放性：测速成功（无错误）的排前面，未测速/失败的排后面
-      const aPlayable = aInfo && !aInfo.hasError ? 1 : 0;
-      const bPlayable = bInfo && !bInfo.hasError ? 1 : 0;
-      if (aPlayable !== bPlayable) return bPlayable - aPlayable;
-
-      // ② 画质：高画质优先（4K>2K>1080p>720p>480p>SD>未知）
-      const aQ = aInfo ? qualityRank(aInfo.quality) : 0;
-      const bQ = bInfo ? qualityRank(bInfo.quality) : 0;
+      // ④ 画质优先
+      const aQ = aInfo && !aInfo.hasError ? qualityRank(aInfo.quality) : 0;
+      const bQ = bInfo && !bInfo.hasError ? qualityRank(bInfo.quality) : 0;
       if (aQ !== bQ) return bQ - aQ;
 
-      // ③ 延迟：无测速数据的排最后，其余按 ms 从小到大（快→慢）
+      // ⑤ 速度快的优先
+      const aS = aInfo && !aInfo.hasError ? speedRank(aInfo.loadSpeed) : -1;
+      const bS = bInfo && !bInfo.hasError ? speedRank(bInfo.loadSpeed) : -1;
+      if (aS !== bS) return bS - aS;
+
+      // ⑥ 延迟兜底
       const aPing = aInfo && !aInfo.hasError ? aInfo.pingTime : -1;
       const bPing = bInfo && !bInfo.hasError ? bInfo.pingTime : -1;
-      if (aPing < 0 && bPing < 0) return 0;
-      if (aPing < 0) return 1;
-      if (bPing < 0) return -1;
-      return aPing - bPing;
+      if (aPing !== bPing) {
+        if (aPing < 0) return 1;
+        if (bPing < 0) return -1;
+        return aPing - bPing;
+      }
+
+      // ⑦ 大陆用户：360 资源同档优先
+      if (isCNUser) {
+        const a360 = a.source?.toString() === 'zy360' ? 1 : 0;
+        const b360 = b.source?.toString() === 'zy360' ? 1 : 0;
+        if (a360 !== b360) return b360 - a360;
+      }
+      return 0;
     });
     return list;
   }, [availableSources, currentSource, currentId, videoInfoMap, isCNUser]);

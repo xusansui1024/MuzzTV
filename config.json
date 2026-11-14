@@ -99,6 +99,26 @@
     "maoyan": {
       "api": "https://api.maoyanapi.top/api.php/provide/vod",
       "name": "猫眼资源"
+    },
+    "lzizy1": {
+      "api": "https://lzizy1.com/api.php/provide/vod",
+      "name": "量子资源2"
+    },
+    "lovedan": {
+      "api": "https://www.lovedan.net/api.php/provide/vod",
+      "name": "乐丹资源"
+    },
+    "uku": {
+      "api": "https://api.ukuapi88.com/api.php/provide/vod",
+      "name": "U酷资源"
+    },
+    "iqiyi": {
+      "api": "https://iqiyizyapi.com/api.php/provide/vod",
+      "name": "奇异资源"
+    },
+    "wujin": {
+      "api": "https://api.wujinapi.com/api.php/provide/vod",
+      "name": "无尽资源"
     }
   },
   "SiteConfig": {
