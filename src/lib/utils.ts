@@ -137,8 +137,14 @@ export async function getVideoResolutionFromM3u8(m3u8Url: string): Promise<{
 
   // ① 先取播放列表文本，既算 ping 也用于画质兜底（hls 常常解不出 width）
   let playlistQuality = '未知';
+  // 取播放列表必须带硬超时：无超时的 fetch 会永久挂起，把整个优选流程卡死
+  const playlistAbort = new AbortController();
+  const playlistTimer = setTimeout(() => playlistAbort.abort(), 3000);
   try {
-    const res = await fetch(m3u8Url, { cache: 'no-store' });
+    const res = await fetch(m3u8Url, {
+      cache: 'no-store',
+      signal: playlistAbort.signal,
+    });
     pingTime = Math.round(performance.now() - pingStart);
     if (res.ok) {
       const text = await res.text();
@@ -146,10 +152,16 @@ export async function getVideoResolutionFromM3u8(m3u8Url: string): Promise<{
     }
   } catch {
     pingTime = Math.round(performance.now() - pingStart);
+  } finally {
+    clearTimeout(playlistTimer);
   }
 
   // ② hls.js 实测速度与真实解码尺寸
-  return new Promise((resolve, reject) => {
+  const inner = new Promise<{
+    quality: string;
+    loadSpeed: string;
+    pingTime: number;
+  }>((resolve, reject) => {
     const video = document.createElement('video');
     video.muted = true;
     video.preload = 'metadata';
@@ -185,7 +197,7 @@ export async function getVideoResolutionFromM3u8(m3u8Url: string): Promise<{
         cleanup();
         reject(new Error('Timeout loading video metadata'));
       }
-    }, 8000);
+    }, 5000);
 
     let actualLoadSpeed = '未知';
     let hasSpeed = false;
@@ -260,5 +272,23 @@ export async function getVideoResolutionFromM3u8(m3u8Url: string): Promise<{
 
     hls.loadSource(m3u8Url);
     hls.attachMedia(video);
+  });
+
+  // 硬兜底：内部任何环节挂起，都必须在 8 秒内给前端一个结果，
+  // 避免‘正在优选最佳播放源’永久转圈
+  let guardTimer: ReturnType<typeof setTimeout> | undefined;
+  const guard = new Promise<{
+    quality: string;
+    loadSpeed: string;
+    pingTime: number;
+  }>((resolve) => {
+    guardTimer = setTimeout(
+      () => resolve({ quality: playlistQuality, loadSpeed: '未知', pingTime }),
+      8000
+    );
+  });
+
+  return Promise.race([inner, guard]).finally(() => {
+    if (guardTimer) clearTimeout(guardTimer);
   });
 }
