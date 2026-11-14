@@ -40,6 +40,33 @@ const qualityRank = (quality: string | undefined): number => {
   }
 };
 
+// 广告状态（2026-11-14 逐个源实播抽帧实测）
+// 无广告：4 个时间点画面均无赌博广告
+const CLEAN_SOURCES = new Set([
+  'ruyi', // 如意资源
+  'dyttzy', // 电影天堂
+  'bfzy', // 暴风资源
+  'ffzy', // 非凡影视
+  'feifan', // 非凡资源
+  'ikun', // iKun资源
+  'zuid', // 最大资源
+]);
+// 含广告：画面烧录水印/跑马灯，或 m3u8 内插播广告分片
+const AD_SOURCES = new Set([
+  'zy360', // 360资源：m3u8 断点处插 8 块独立广告
+  'jinying', // 金鹰资源：50825.com 水印
+  'jisu', // 极速资源：78067.com 水印
+  'hongniu', // 红牛资源：50825.com 水印
+  'hongniu3', // 红牛资源3：同上
+  'hhzy', // 豪华资源：50825.com 水印
+  'guangsu', // 光速资源：50825.com 水印
+  'subo', // 速博资源：50825.com 水印
+  'xinlang', // 新浪点播：同上
+  'mdzy', // 魔都资源：开元棋牌跑马灯
+  'modudm', // 魔都动漫：同上
+  'piaoling', // 飘零资源：天地壹号跑马灯
+]);
+
 interface EpisodeSelectorProps {
   /** 总集数 */
   totalEpisodes: number;
@@ -621,12 +648,24 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
                         </div>
 
                         {/* 源名称和集数信息 - 垂直居中 */}
-                        <div className='flex items-center justify-between'>
-                          <span className='text-xs px-2 py-1 border border-gray-500/60 rounded text-gray-700 dark:text-gray-300'>
-                            {source.source_name}
-                          </span>
+                        <div className='flex items-center justify-between gap-2'>
+                          <div className='flex items-center gap-1.5 min-w-0'>
+                            <span className='text-xs px-2 py-1 border border-gray-500/60 rounded text-gray-700 dark:text-gray-300 whitespace-nowrap'>
+                              {source.source_name}
+                            </span>
+                            {CLEAN_SOURCES.has(source.source) && (
+                              <span className='text-[10px] leading-tight px-1.5 py-0.5 rounded border border-green-500/40 bg-green-500/10 text-green-600 dark:text-green-400 whitespace-nowrap'>
+                                无广告
+                              </span>
+                            )}
+                            {AD_SOURCES.has(source.source) && (
+                              <span className='text-[10px] leading-tight px-1.5 py-0.5 rounded border border-red-500/40 bg-red-500/10 text-red-600 dark:text-red-400 whitespace-nowrap'>
+                                含广告
+                              </span>
+                            )}
+                          </div>
                           {source.episodes.length > 1 && (
-                            <span className='text-xs text-gray-500 dark:text-gray-400 font-medium'>
+                            <span className='text-xs text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap'>
                               {source.episodes.length} 集
                             </span>
                           )}
