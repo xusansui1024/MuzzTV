@@ -50,24 +50,37 @@ export function normalizeCity(value: string): string {
 }
 
 /**
- * 拼成中文归属地，例：
- *   TW + Toufen  -> 台湾 苗栗縣 頭份市
- *   CN + Shanghai-> 中国大陆 上海市
- *   空值         -> 空字符串
+ * 拼中文归属地。规则：
+ *   国家 省 市（省与市同名时只显示一次，例如直辖市）
+ *   TW + Toufen   -> 台湾 苗栗縣 頭份市
+ *   CN + Shanghai -> 中国大陆 上海市
+ *   CN + Shucheng -> 中国大陆 安徽省 舒城县
+ *   US + San Jose -> 美国 San Jose
  */
+export function buildPlace(
+  countryCn: string,
+  province: string,
+  cityName: string
+): string {
+  const parts: string[] = [];
+  if (countryCn) parts.push(countryCn);
+
+  const prov = province && province !== countryCn ? province : '';
+  const city = cityName && cityName !== countryCn ? cityName : '';
+
+  if (prov && city && prov === city) {
+    // 省名与市名相同（直辖市、港澳等），只显示一次
+    parts.push(prov);
+  } else {
+    if (prov) parts.push(prov);
+    if (city) parts.push(city);
+  }
+  return parts.join(' ');
+}
+
+/** 直接从 Vercel 头里的国家/城市查表并拼中文 */
 export function formatPlace(country: string, city: string): string {
   const countryCn = COUNTRY_CN[(country || '').toUpperCase()] || country || '';
   const record = city ? CITY_GEO[normalizeCity(city)] : undefined;
-  const cityName = record?.n || city || '';
-  const province = record?.p || '';
-
-  const parts: string[] = [];
-  if (countryCn) parts.push(countryCn);
-  if (province && province !== countryCn && province !== cityName) {
-    parts.push(province);
-  }
-  if (cityName && cityName !== countryCn && cityName !== province) {
-    parts.push(cityName);
-  }
-  return parts.join(' ');
+  return buildPlace(countryCn, record?.p || '', record?.n || city || '');
 }

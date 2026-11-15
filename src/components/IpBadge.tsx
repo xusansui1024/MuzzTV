@@ -12,6 +12,7 @@ interface IpInfo {
   countryCn?: string;
   provinceCn?: string;
   cityCn?: string;
+  place?: string;
 }
 
 const IpBadge = () => {
@@ -34,17 +35,22 @@ const IpBadge = () => {
 
   if (!info || !info.ip) return null;
 
-  // 中文优先，表里查不到时用接口返回的原始英文名
-  const country = info.countryCn || info.country || '';
-  const province = info.provinceCn || '';
-  const city = info.cityCn || info.city || '';
-
-  const placeParts: string[] = [];
-  if (country) placeParts.push(country);
-  if (province && province !== country && province !== city)
-    placeParts.push(province);
-  if (city && city !== country && city !== province) placeParts.push(city);
-  const place = placeParts.join(' ');
+  // 后端已经拼好中文归属地，直接用；拿不到时做一次本地兜底
+  let place = info.place || '';
+  if (!place) {
+    const country = info.countryCn || info.country || '';
+    const province = info.provinceCn || '';
+    const city = info.cityCn || info.city || '';
+    const parts: string[] = [];
+    if (country) parts.push(country);
+    if (province && city && province === city) {
+      parts.push(province);
+    } else {
+      if (province && province !== country) parts.push(province);
+      if (city && city !== country) parts.push(city);
+    }
+    place = parts.join(' ');
+  }
 
   return (
     <div className='mt-8 mb-2 flex justify-center'>
