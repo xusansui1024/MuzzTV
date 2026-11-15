@@ -40,5 +40,5 @@ CHANGELOG.md
 
 pnpm-lock.yaml
 
-# 地名映射数据（约 500KB，保持单行，不参与格式化）
-src/lib/geo-zh.json
+# 地名映射数据（体积大，保持单行，不参与格式化）
+src/lib/geo-zh*.json

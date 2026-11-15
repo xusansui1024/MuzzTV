@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { getAuthInfoFromCookie } from '@/lib/auth';
+import { formatPlace } from '@/lib/geo-cn';
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -19,8 +20,8 @@ export async function middleware(request: NextRequest) {
   const edge = (request.headers.get('x-vercel-id') || '').split('::')[0] || '-';
 
   console.log(
-    `[实时监控] ${pathname} | 访客 ${ip} | ${country || '??'}${
-      city ? ' ' + city : ''
+    `[实时监控] ${pathname} | 访客 ${ip} | ${
+      formatPlace(country, city) || '??'
     } | 机房 ${edge}`
   );
 
