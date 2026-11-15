@@ -7,12 +7,22 @@ import { getAuthInfoFromCookie } from '@/lib/auth';
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // 💡 新增这两行：获取并打印访客的真实 IP
-  const ip = request.headers.get('x-forwarded-for') || request.ip || '未知 IP';
-  console.log(`[实时监控] 路径: ${pathname} | 访客 IP: ${ip}`);
+  // 💡 打印访客真实 IP + 归属地 + 处理的机房
+  // x-forwarded-for 第一段是真实客户端 IP；x-vercel-ip-* 是 Vercel 解析出的归属地
+  const forwarded = request.headers.get('x-forwarded-for') || '';
+  const ip = forwarded.split(',')[0].trim() || request.ip || '未知 IP';
 
   // Vercel 自动注入的国家代码（CN=中国大陆, TW=台湾, HK=香港, US=美国...）
   const country = request.headers.get('x-vercel-ip-country') || '';
+  const city = safeDecode(request.headers.get('x-vercel-ip-city'));
+  // x-vercel-id 形如 hkg1::sin1::xxxx，第一段是边缘机房（hkg1=香港）
+  const edge = (request.headers.get('x-vercel-id') || '').split('::')[0] || '-';
+
+  console.log(
+    `[实时监控] ${pathname} | 访客 ${ip} | ${country || '??'}${
+      city ? ' ' + city : ''
+    } | 机房 ${edge}`
+  );
 
   // 给 next() 响应附加国家 cookie（供前端判断是否大陆用户，如换源优先级）
   const withCountryCookie = (response: NextResponse): NextResponse => {
@@ -32,7 +42,8 @@ export async function middleware(request: NextRequest) {
   if (
     pathname.startsWith('/api/proxy') ||
     pathname.startsWith('/api/douban') ||
-    pathname.startsWith('/api/search')
+    pathname.startsWith('/api/search') ||
+    pathname.startsWith('/api/myip')
   ) {
     return withCountryCookie(NextResponse.next());
   }
@@ -87,6 +98,16 @@ export async function middleware(request: NextRequest) {
 
   // 签名验证失败或不存在签名
   return handleAuthFailure(request, pathname);
+}
+
+// 安全解码（Vercel 的归属地头是 URL 编码，损坏时不能抛错）
+function safeDecode(value: string | null): string {
+  if (!value) return '';
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
 }
 
 // 验证签名

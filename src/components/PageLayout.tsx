@@ -1,4 +1,5 @@
 import { BackButton } from './BackButton';
+import IpBadge from './IpBadge';
 import MobileBottomNav from './MobileBottomNav';
 import MobileHeader from './MobileHeader';
 import Sidebar from './Sidebar';
@@ -47,6 +48,7 @@ const PageLayout = ({ children, activePath = '/' }: PageLayoutProps) => {
           >
             {children}
           </main>
+          <IpBadge />
         </div>
       </div>
 
