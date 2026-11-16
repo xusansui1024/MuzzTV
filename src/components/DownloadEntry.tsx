@@ -124,11 +124,11 @@ const DownloadEntry = ({ variant = 'desktop' }: DownloadEntryProps) => {
     <>
       <button
         onClick={() => setOpen(true)}
-        className='flex items-center justify-center w-10 h-10 rounded-full bg-green-600 text-white shadow-sm shadow-green-600/25 transition-transform active:scale-95'
+        className='w-10 h-10 p-2 rounded-full flex items-center justify-center text-gray-600 hover:bg-gray-200/50 dark:text-gray-300 dark:hover:bg-gray-700/50 transition-colors'
         title='下载客户端'
         aria-label='下载客户端'
       >
-        <Download className='w-5 h-5' />
+        <Download className='w-full h-full' />
       </button>
 
       {mounted &&
