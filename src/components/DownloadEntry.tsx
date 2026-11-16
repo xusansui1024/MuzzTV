@@ -20,21 +20,11 @@ const PlatformIcon = ({ icon }: { icon: string }) => {
 const DownloadEntry = ({ variant = 'desktop' }: DownloadEntryProps) => {
   const [hovered, setHovered] = useState(false);
   const [open, setOpen] = useState(false);
-  const [qrSrc, setQrSrc] = useState('');
   const [inWechat, setInWechat] = useState(false);
 
   useEffect(() => {
     setInWechat(/MicroMessenger/i.test(navigator.userAgent));
   }, []);
-
-  // 二维码指向下载落地页，域名取当前访问的 origin
-  useEffect(() => {
-    if ((!hovered && !open) || qrSrc) return;
-    const base = window.location.origin;
-    setQrSrc(
-      `${base}/api/qr?u=${encodeURIComponent(base + DOWNLOAD_PAGE_PATH)}`
-    );
-  }, [hovered, open, qrSrc]);
 
   useEffect(() => {
     if (!open) return;
@@ -73,8 +63,13 @@ const DownloadEntry = ({ variant = 'desktop' }: DownloadEntryProps) => {
 
               <div className='w-[300px] rounded-2xl p-4 border border-white/60 dark:border-white/10 bg-white/70 dark:bg-gray-900/75 backdrop-blur-2xl shadow-[0_16px_48px_-16px_rgba(0,0,0,0.3)]'>
                 <div className='flex items-center gap-2.5'>
-                  <div className='shrink-0 w-9 h-9 rounded-lg bg-green-600 text-white flex items-center justify-center'>
-                    <Tv className='w-5 h-5' />
+                  <div className='shrink-0 w-9 h-9 rounded-lg overflow-hidden ring-1 ring-black/5 dark:ring-white/10'>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src='/logo.png'
+                      alt='客户端图标'
+                      className='w-full h-full object-cover'
+                    />
                   </div>
                   <div className='min-w-0'>
                     <div className='text-sm font-medium text-gray-900 dark:text-gray-100'>
@@ -108,24 +103,6 @@ const DownloadEntry = ({ variant = 'desktop' }: DownloadEntryProps) => {
                       <Download className='w-4 h-4 shrink-0 text-green-600 dark:text-green-400' />
                     </a>
                   ))}
-                </div>
-
-                <div className='mt-3 pt-3 border-t border-gray-900/5 dark:border-white/10 flex items-center gap-2.5'>
-                  {qrSrc ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={qrSrc}
-                      alt='扫码下载'
-                      className='shrink-0 w-14 h-14 rounded bg-white p-0.5 border border-gray-100 dark:border-gray-700'
-                    />
-                  ) : (
-                    <div className='shrink-0 w-14 h-14 rounded bg-gray-100 dark:bg-gray-800' />
-                  )}
-                  <span className='text-[11px] leading-relaxed text-gray-500 dark:text-gray-400'>
-                    手机扫码打开下载页
-                    <br />
-                    自动按设备推荐版本
-                  </span>
                 </div>
               </div>
             </div>
