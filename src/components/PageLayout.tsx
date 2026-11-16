@@ -54,10 +54,7 @@ const PageLayout = ({ children, activePath = '/' }: PageLayoutProps) => {
         </div>
       </div>
 
-      {/* 移动端左下角下载入口 */}
-      <div className='md:hidden fixed left-4 bottom-[4.75rem] z-30'>
-        <DownloadEntry variant='floating' />
-      </div>
+      {/* 移动端下载入口已移入 MobileHeader 右上角按钮组 */}
 
       {/* 移动端底部导航 */}
       <div className='md:hidden'>

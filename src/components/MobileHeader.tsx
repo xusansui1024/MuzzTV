@@ -3,6 +3,7 @@
 import Link from 'next/link';
 
 import { BackButton } from './BackButton';
+import DownloadEntry from './DownloadEntry';
 import { useSite } from './SiteProvider';
 import { ThemeToggle } from './ThemeToggle';
 import { UserMenu } from './UserMenu';
@@ -22,8 +23,11 @@ const MobileHeader = ({ showBackButton = false }: MobileHeaderProps) => {
         </div>
 
         {/* 右侧按钮 */}
-        <div className='flex items-center gap-2'>
-          <ThemeToggle />
+        <div className='flex items-center'>
+          <DownloadEntry variant='floating' />
+          <div className='mobile-theme-slot'>
+            <ThemeToggle />
+          </div>
           <UserMenu />
         </div>
       </div>
@@ -32,7 +36,7 @@ const MobileHeader = ({ showBackButton = false }: MobileHeaderProps) => {
       <div className='absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2'>
         <Link
           href='/'
-          className='text-2xl font-bold text-green-600 tracking-tight hover:opacity-80 transition-opacity'
+          className='text-xl font-bold text-green-600 tracking-tight hover:opacity-80 transition-opacity'
         >
           {siteName}
         </Link>

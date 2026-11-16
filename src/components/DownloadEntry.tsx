@@ -3,6 +3,7 @@
 import { Download, Monitor, Smartphone, Tv, X } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import { DOWNLOAD_PAGE_PATH, DOWNLOADS } from '@/lib/downloads';
 
@@ -21,6 +22,13 @@ const DownloadEntry = ({ variant = 'desktop' }: DownloadEntryProps) => {
   const [hovered, setHovered] = useState(false);
   const [open, setOpen] = useState(false);
   const [inWechat, setInWechat] = useState(false);
+  // 移动端按钮现在位于带 backdrop-blur 的顶栏内，backdrop-filter 会成为 fixed 元素的 containing block，
+  // 导致底部抽屉被裁成顶栏高度。用 Portal 把抽屉挂到 body 上，脱离该影响。
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     setInWechat(/MicroMessenger/i.test(navigator.userAgent));
@@ -116,98 +124,101 @@ const DownloadEntry = ({ variant = 'desktop' }: DownloadEntryProps) => {
     <>
       <button
         onClick={() => setOpen(true)}
-        className='flex items-center justify-center w-11 h-11 rounded-full bg-green-600 text-white shadow-lg shadow-green-600/25 transition-transform active:scale-95'
+        className='flex items-center justify-center w-10 h-10 rounded-full bg-green-600 text-white shadow-sm shadow-green-600/25 transition-transform active:scale-95'
         title='下载客户端'
         aria-label='下载客户端'
       >
         <Download className='w-5 h-5' />
       </button>
 
-      {open && (
-        <div className='fixed inset-0 z-[60] flex items-end justify-center md:items-center'>
-          {/* 遮罩 */}
-          <div
-            className='absolute inset-0 bg-black/50'
-            onClick={() => setOpen(false)}
-          />
+      {mounted &&
+        open &&
+        createPortal(
+          <div className='fixed inset-0 z-[60] flex items-end justify-center md:items-center'>
+            {/* 遮罩 */}
+            <div
+              className='absolute inset-0 bg-black/50'
+              onClick={() => setOpen(false)}
+            />
 
-          {/* 面板：移动端底部抽屉 */}
-          <div className='relative w-full md:w-[620px] max-h-[88vh] overflow-y-auto bg-white/90 dark:bg-gray-900/90 backdrop-blur-2xl rounded-t-2xl md:rounded-2xl shadow-2xl border border-white/50 dark:border-white/10 animate-[slideUp_180ms_ease-out]'>
-            {/* 头部 */}
-            <div className='flex items-start justify-between px-5 pt-5 pb-3'>
-              <div>
-                <h2 className='text-lg font-semibold text-gray-900 dark:text-gray-100'>
-                  下载客户端
-                </h2>
-                <p className='text-xs text-gray-500 dark:text-gray-400 mt-1'>
-                  装到设备上直接看，比浏览器更顺
-                </p>
-              </div>
-              <button
-                onClick={() => setOpen(false)}
-                className='p-1.5 -mt-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 dark:hover:text-gray-300'
-                aria-label='关闭'
-              >
-                <X className='w-5 h-5' />
-              </button>
-            </div>
-
-            {/* 微信内提示 */}
-            {inWechat && (
-              <div className='mx-5 mb-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 px-3 py-2 text-xs text-amber-700 dark:text-amber-400'>
-                微信内无法直接安装，请点右上角「⋯」选择「在浏览器打开」
-              </div>
-            )}
-
-            {/* 下载卡片 */}
-            <div className='px-5 pb-3 grid gap-3 md:grid-cols-2'>
-              {DOWNLOADS.map((item) => (
-                <div
-                  key={item.id}
-                  className='rounded-xl border border-gray-200 dark:border-gray-700/70 p-4 flex flex-col'
-                >
-                  <div className='flex items-start gap-3'>
-                    <div className='shrink-0 w-10 h-10 rounded-lg bg-green-50 dark:bg-green-900/25 text-green-600 dark:text-green-400 flex items-center justify-center'>
-                      <PlatformIcon icon={item.icon} />
-                    </div>
-                    <div className='min-w-0 flex-1'>
-                      <div className='flex items-center gap-1.5 flex-wrap'>
-                        <span className='text-sm font-medium text-gray-900 dark:text-gray-100'>
-                          {item.title}
-                        </span>
-                        {item.recommend && (
-                          <span className='text-[10px] leading-none px-1.5 py-0.5 rounded bg-green-600 text-white'>
-                            推荐
-                          </span>
-                        )}
-                      </div>
-                      <div className='text-xs text-gray-500 dark:text-gray-400 mt-1'>
-                        v{item.version} · {item.size}
-                      </div>
-                      <div className='text-[11px] text-gray-400 dark:text-gray-500 mt-0.5'>
-                        {item.note}
-                      </div>
-                    </div>
-                  </div>
-
-                  <a
-                    href={item.file}
-                    download
-                    className='mt-3 flex items-center justify-center gap-1.5 h-9 rounded-lg bg-green-600 text-white text-sm font-medium transition-colors hover:bg-green-700 active:bg-green-800'
-                  >
-                    <Download className='w-4 h-4' />
-                    立即下载
-                  </a>
+            {/* 面板：移动端底部抽屉 */}
+            <div className='relative w-full md:w-[620px] max-h-[88vh] overflow-y-auto bg-white/90 dark:bg-gray-900/90 backdrop-blur-2xl rounded-t-2xl md:rounded-2xl shadow-2xl border border-white/50 dark:border-white/10 animate-[slideUp_180ms_ease-out]'>
+              {/* 头部 */}
+              <div className='flex items-start justify-between px-5 pt-5 pb-3'>
+                <div>
+                  <h2 className='text-lg font-semibold text-gray-900 dark:text-gray-100'>
+                    下载客户端
+                  </h2>
+                  <p className='text-xs text-gray-500 dark:text-gray-400 mt-1'>
+                    装到设备上直接看，比浏览器更顺
+                  </p>
                 </div>
-              ))}
-            </div>
+                <button
+                  onClick={() => setOpen(false)}
+                  className='p-1.5 -mt-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 dark:hover:text-gray-300'
+                  aria-label='关闭'
+                >
+                  <X className='w-5 h-5' />
+                </button>
+              </div>
 
-            <div className='px-5 pb-5 text-[11px] text-gray-400 dark:text-gray-500'>
-              安卓包同时支持手机、平板与电视盒子；电视端用 U 盘安装更方便。
+              {/* 微信内提示 */}
+              {inWechat && (
+                <div className='mx-5 mb-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 px-3 py-2 text-xs text-amber-700 dark:text-amber-400'>
+                  微信内无法直接安装，请点右上角「⋯」选择「在浏览器打开」
+                </div>
+              )}
+
+              {/* 下载卡片 */}
+              <div className='px-5 pb-3 grid gap-3 md:grid-cols-2'>
+                {DOWNLOADS.map((item) => (
+                  <div
+                    key={item.id}
+                    className='rounded-xl border border-gray-200 dark:border-gray-700/70 p-4 flex flex-col'
+                  >
+                    <div className='flex items-start gap-3'>
+                      <div className='shrink-0 w-10 h-10 rounded-lg bg-green-50 dark:bg-green-900/25 text-green-600 dark:text-green-400 flex items-center justify-center'>
+                        <PlatformIcon icon={item.icon} />
+                      </div>
+                      <div className='min-w-0 flex-1'>
+                        <div className='flex items-center gap-1.5 flex-wrap'>
+                          <span className='text-sm font-medium text-gray-900 dark:text-gray-100'>
+                            {item.title}
+                          </span>
+                          {item.recommend && (
+                            <span className='text-[10px] leading-none px-1.5 py-0.5 rounded bg-green-600 text-white'>
+                              推荐
+                            </span>
+                          )}
+                        </div>
+                        <div className='text-xs text-gray-500 dark:text-gray-400 mt-1'>
+                          v{item.version} · {item.size}
+                        </div>
+                        <div className='text-[11px] text-gray-400 dark:text-gray-500 mt-0.5'>
+                          {item.note}
+                        </div>
+                      </div>
+                    </div>
+
+                    <a
+                      href={item.file}
+                      download
+                      className='mt-3 flex items-center justify-center gap-1.5 h-9 rounded-lg bg-green-600 text-white text-sm font-medium transition-colors hover:bg-green-700 active:bg-green-800'
+                    >
+                      <Download className='w-4 h-4' />
+                      立即下载
+                    </a>
+                  </div>
+                ))}
+              </div>
+
+              <div className='px-5 pb-5 text-[11px] text-gray-400 dark:text-gray-500'>
+                安卓包同时支持手机、平板与电视盒子；电视端用 U 盘安装更方便。
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
     </>
   );
 };

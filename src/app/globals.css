@@ -13,6 +13,13 @@
   }
 }
 
+/* 超窄屏（<360px）容不下「下载 + 主题 + 用户」三个按钮，隐藏主题切换以保住下载入口 */
+@media (max-width: 359px) {
+  .mobile-theme-slot {
+    display: none;
+  }
+}
+
 :root {
   --foreground-rgb: 255, 255, 255;
 }
