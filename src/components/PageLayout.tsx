@@ -1,4 +1,5 @@
 import { BackButton } from './BackButton';
+import DownloadEntry from './DownloadEntry';
 import IpBadge from './IpBadge';
 import MobileBottomNav from './MobileBottomNav';
 import MobileHeader from './MobileHeader';
@@ -35,6 +36,7 @@ const PageLayout = ({ children, activePath = '/' }: PageLayoutProps) => {
 
           {/* 桌面端顶部按钮 */}
           <div className='absolute top-2 right-4 z-20 hidden md:flex items-center gap-2'>
+            <DownloadEntry />
             <ThemeToggle />
             <UserMenu />
           </div>
@@ -50,6 +52,11 @@ const PageLayout = ({ children, activePath = '/' }: PageLayoutProps) => {
           </main>
           <IpBadge />
         </div>
+      </div>
+
+      {/* 移动端左下角下载入口 */}
+      <div className='md:hidden fixed left-4 bottom-[4.75rem] z-30'>
+        <DownloadEntry variant='floating' />
       </div>
 
       {/* 移动端底部导航 */}

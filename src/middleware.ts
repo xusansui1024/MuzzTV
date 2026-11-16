@@ -44,7 +44,11 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api/proxy') ||
     pathname.startsWith('/api/douban') ||
     pathname.startsWith('/api/search') ||
-    pathname.startsWith('/api/myip')
+    pathname.startsWith('/api/myip') ||
+    // 客户端下载页与安装包：让朋友扫码即可下载，不需要站点密码
+    pathname.startsWith('/download') ||
+    pathname.startsWith('/downloads') ||
+    pathname.startsWith('/api/qr')
   ) {
     return withCountryCookie(NextResponse.next());
   }

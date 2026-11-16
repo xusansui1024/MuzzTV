@@ -225,3 +225,15 @@ div[data-media-provider] video {
 .tv-mode .md\:grid {
   grid-template-columns: auto 1fr !important;
 }
+
+/* 下载入口面板上滑动画 */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
