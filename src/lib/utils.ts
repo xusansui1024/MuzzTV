@@ -22,7 +22,8 @@ export function getImageProxyUrl(): string {
     }
   }
 
-  return 'https://wsrv.nl/?url=';
+  // 无任何代理配置时直接请求原始图（wsrv.nl 已取不到豆瓣图片，不再作为默认代理）
+  return '';
 }
 
 /**
