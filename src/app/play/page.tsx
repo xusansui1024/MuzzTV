@@ -182,7 +182,7 @@ function PlayPageClient() {
 
   // 保存优选时的测速结果，避免EpisodeSelector重复测速
   const [precomputedVideoInfo, setPrecomputedVideoInfo] = useState<
-    Map<string, { quality: string; loadSpeed: string; pingTime: number }>
+    Map<string, { quality: string; loadSpeed: string; pingTime: number; hasError?: boolean }>
   >(new Map());
 
   // 折叠状态（仅在 lg 及以上屏幕有效）
@@ -211,6 +211,20 @@ function PlayPageClient() {
   // 工具函数（Utils）
   // -----------------------------------------------------------------------------
 
+  // webOS / 部分智能电视的 web 引擎对 hls.js 的 MSE 兼容性较差，
+  // 先探测是否支持 MediaSource 且能播 HLS；不支持时回退原生 video 直链播放。
+  const nativeCanPlayHls = (url: string): boolean => {
+    try {
+      const v = document.createElement('video');
+      if (!v.canPlayType) return false;
+      const t = v.canPlayType('application/vnd.apple.mpegurl');
+      if (!t) return false;
+      return /^(probably|maybe)$/i.test(t);
+    } catch {
+      return false;
+    }
+  };
+
   // 播放源优选函数
   const preferBestSource = async (
     sources: SearchResult[]
@@ -221,7 +235,7 @@ function PlayPageClient() {
     const batchSize = Math.ceil(sources.length / 2);
     const allResults: Array<{
       source: SearchResult;
-      testResult: { quality: string; loadSpeed: string; pingTime: number };
+      testResult: { quality: string; loadSpeed: string; pingTime: number; hasError?: boolean };
     } | null> = [];
 
     for (let start = 0; start < sources.length; start += batchSize) {
@@ -329,7 +343,7 @@ function PlayPageClient() {
     // 大陆用户：360资源（zy360）测速成功时强制优先选它（独立 IP 直连，大陆访问稳定）
     if (isCNUser) {
       const idx = resultsWithScore.findIndex(
-        (r) => r.source.source === 'zy360' && !r.testResult.hasError
+        (r) => r.source.source === 'zy360' && !('hasError' in r.testResult && r.testResult.hasError)
       );
       if (idx > 0) {
         const [picked] = resultsWithScore.splice(idx, 1);
@@ -1201,6 +1215,12 @@ function PlayPageClient() {
       typeof window !== 'undefined' &&
       typeof (window as any).webkitConvertPointFromNodeToPage === 'function';
 
+    // 不支持 MSE 的环境（部分 webOS 电视）：关闭 hls.js，直接用原生 video 播放 m3u8 直链
+    const useNativeHls =
+      typeof window !== 'undefined' &&
+      typeof MediaSource === 'undefined' &&
+      nativeCanPlayHls(videoUrl);
+
     // 非WebKit浏览器且播放器已存在，使用switch方法切换
     if (!isWebkit && artPlayerRef.current) {
       artPlayerRef.current.switch = videoUrl;
@@ -1267,7 +1287,9 @@ function PlayPageClient() {
           crossOrigin: 'anonymous',
         },
         // HLS 支持配置
-        customType: {
+        customType: useNativeHls
+          ? undefined
+          : {
           m3u8: function (video: HTMLVideoElement, url: string) {
             if (!Hls) {
               console.error('HLS.js 未加载');
@@ -1318,7 +1340,7 @@ function PlayPageClient() {
                 }
               }
             });
-          },
+          }
         },
         icons: {
           loading:

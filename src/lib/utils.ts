@@ -132,6 +132,7 @@ export async function getVideoResolutionFromM3u8(m3u8Url: string): Promise<{
   quality: string;
   loadSpeed: string;
   pingTime: number;
+  hasError?: boolean;
 }> {
   const pingStart = performance.now();
   let pingTime = 0;
