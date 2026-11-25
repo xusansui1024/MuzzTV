@@ -51,7 +51,9 @@ export default function TvNavigation() {
           rect.width > 2 &&
           rect.height > 2 &&
           style.visibility !== 'hidden' &&
-          style.display !== 'none'
+          style.display !== 'none' &&
+          style.opacity !== '0' &&
+          el.offsetParent !== null
         );
       });
     };
@@ -100,11 +102,11 @@ export default function TvNavigation() {
         const dx = cx - curCX;
         const dy = cy - curCY;
 
-        // 方向约束：只考虑目标方向上的元素（±16px 阈值，容忍卡片行高微差，避免误判）
-        if (dir === 'left' && dx > -16) continue;
-        if (dir === 'right' && dx < 16) continue;
-        if (dir === 'up' && dy > -16) continue;
-        if (dir === 'down' && dy < 16) continue;
+        // 方向约束：只考虑目标方向上的元素（±6px 阈值，低分值避免电视侧栏/卡片因行高微差被误排除）
+        if (dir === 'left' && dx > -6) continue;
+        if (dir === 'right' && dx < 6) continue;
+        if (dir === 'up' && dy > -6) continue;
+        if (dir === 'down' && dy < 6) continue;
 
         // 水平移动：优先垂直中心接近（同行）；垂直移动：优先水平中心接近（同列）
         let score: number;
@@ -124,6 +126,32 @@ export default function TvNavigation() {
         if (score < bestScore) {
           bestScore = score;
           best = el;
+        }
+      }
+
+      // 兜底：若严格方向上没找到候选（电视布局/缩放导致对齐偏差），
+      // 退化为在整个可聚焦列表里选该方向距离最近的元素，避免焦点卡死在单项上。
+      if (!best) {
+        for (const el of els) {
+          if (el === current) continue;
+          const r = el.getBoundingClientRect();
+          const cx = r.left + r.width / 2;
+          const cy = r.top + r.height / 2;
+          const dx = cx - curCX;
+          const dy = cy - curCY;
+          const score =
+            dir === 'left' || dir === 'right'
+              ? Math.abs(dy) + Math.abs(dx)
+              : Math.abs(dx) + Math.abs(dy);
+          const inDir =
+            (dir === 'left' && dx < 0) ||
+            (dir === 'right' && dx > 0) ||
+            (dir === 'up' && dy < 0) ||
+            (dir === 'down' && dy > 0);
+          if (inDir && score < bestScore) {
+            bestScore = score;
+            best = el;
+          }
         }
       }
       if (best) focusEl(best);
@@ -192,10 +220,9 @@ export default function TvNavigation() {
     // 进入页面/路由变化后聚焦第一个元素
     const timer = window.setTimeout(focusFirst, 500);
     const onRouteChange = () => {
-      const t = window.setTimeout(focusFirst, 300);
+      window.setTimeout(focusFirst, 300);
       window.addEventListener('keydown', onKeyDown, { once: true });
       window.clearTimeout(timer);
-      window.setTimeout(() => window.clearTimeout(t), 0);
     };
 
     window.addEventListener('keydown', onKeyDown);
