@@ -197,6 +197,19 @@ div[data-media-provider] video {
   z-index: 30;
 }
 
+/* 封面卡片聚焦：加粗绿色描边 + 轻微放大，遥控器选中时一眼可辨 */
+.tv-mode .tv-focused[data-tv-focusable] {
+  outline: 3px solid #22c55e !important;
+  outline-offset: 4px;
+  border-radius: 0.75rem;
+  box-shadow:
+    0 0 0 2px rgba(34, 197, 94, 0.35),
+    0 0 24px rgba(34, 197, 94, 0.55),
+    0 14px 34px rgba(0, 0, 0, 0.65) !important;
+  transform: scale(1.06);
+  z-index: 40;
+}
+
 /* 播放器聚焦时恢复系统焦点样式，避免覆盖控制条 */
 .tv-mode video.tv-focused {
   outline: none !important;
