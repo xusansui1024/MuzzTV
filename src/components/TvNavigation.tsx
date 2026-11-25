@@ -58,6 +58,43 @@ export default function TvNavigation() {
       });
     };
 
+    // 判断元素是否属于左侧侧边栏（导航菜单）
+    const isSidebarEl = (el: HTMLElement): boolean => {
+      let node: HTMLElement | null = el;
+      while (node) {
+        const cls = (node.className || '').toString();
+        if (cls.includes('sidebar') || cls.includes('Sidebar')) return true;
+        node = node.parentElement;
+      }
+      // 兜底：位于视口左侧 22% 内视为侧边栏
+      const r = el.getBoundingClientRect();
+      return r.left < window.innerWidth * 0.22 && r.width < window.innerWidth * 0.3;
+    };
+
+    // 菜单项上按右键：直接跳到主内容区最靠上、最靠左的封面卡片，
+    // 避免严格对齐时侧边栏与卡片垂直位置差几像素导致跳不过去。
+    const jumpToMainContent = (dir: Dir) => {
+      const els = collect();
+      const cards = els.filter((el) => {
+        const r = el.getBoundingClientRect();
+        const inMain = r.left >= window.innerWidth * 0.22;
+        return inMain && r.width > 30 && r.height > 30;
+      });
+      if (!cards.length) return false;
+      // 优先选与当前项垂直最接近的卡片，再取最靠左
+      const cur = currentRef.current?.getBoundingClientRect();
+      const curCY = cur ? cur.top + cur.height / 2 : 0;
+      cards.sort((a, b) => {
+        const ra = a.getBoundingClientRect();
+        const rb = b.getBoundingClientRect();
+        const ay = Math.abs(ra.top + ra.height / 2 - curCY);
+        const by = Math.abs(rb.top + rb.height / 2 - curCY);
+        return ay - by || ra.left - rb.left;
+      });
+      focusEl(cards[0]);
+      return true;
+    };
+
     const focusEl = (el: HTMLElement) => {
       if (currentRef.current && currentRef.current !== el) {
         currentRef.current.classList.remove('tv-focused');
@@ -86,6 +123,11 @@ export default function TvNavigation() {
       if (!els.length) return;
       if (!current || !document.body.contains(current)) {
         focusFirst();
+        return;
+      }
+      // 侧边栏菜单项上：右键直接跳主内容区（封面），不做同行对齐判断
+      if (dir === 'right' && isSidebarEl(current)) {
+        jumpToMainContent(dir);
         return;
       }
       const curRect = current.getBoundingClientRect();

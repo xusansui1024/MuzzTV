@@ -219,13 +219,28 @@ div[data-media-provider] video {
 
 /* TV 大屏基础字号 */
 .tv-mode {
-  font-size: 16px;
+  font-size: 18px;
 }
 
 @media (min-width: 1600px) {
   .tv-mode {
-    font-size: 18px;
+    font-size: 21px;
   }
+}
+
+/* TV 大屏封面卡片整体放大：65 寸电视观看距离远，避免封面和标题偏小 */
+.tv-mode .group[data-tv-focusable] {
+  min-width: 168px;
+}
+
+/* TV 大屏首页封面网格：卡片列宽加大，减少一屏露出的数量 */
+.tv-mode .sm\:grid-cols-\[repeat\(auto-fill\,_minmax\(11rem\,_1fr\)\)\] {
+  grid-template-columns: repeat(auto-fill, minmax(12.5rem, 1fr)) !important;
+}
+
+.tv-mode nav a,
+.tv-mode nav button {
+  min-height: 52px;
 }
 
 /* TV 模式强制桌面布局：侧边栏分类常驻左侧、隐藏移动端底部导航，
