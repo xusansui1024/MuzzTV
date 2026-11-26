@@ -32,6 +32,13 @@ body {
   overscroll-behavior: none;
 }
 
+/* 禁止双击（及双指）放大页面；manipulation 只挡双击缩放，不影响滚动与单指手势 */
+html {
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   color: rgb(var(--foreground-rgb));
 }
@@ -202,10 +209,8 @@ div[data-media-provider] video {
   outline: 3px solid #22c55e !important;
   outline-offset: 4px;
   border-radius: 0.75rem;
-  box-shadow:
-    0 0 0 2px rgba(34, 197, 94, 0.35),
-    0 0 24px rgba(34, 197, 94, 0.55),
-    0 14px 34px rgba(0, 0, 0, 0.65) !important;
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.35),
+    0 0 24px rgba(34, 197, 94, 0.55), 0 14px 34px rgba(0, 0, 0, 0.65) !important;
   transform: scale(1.06);
   z-index: 40;
 }

@@ -39,6 +39,10 @@ export async function generateMetadata(): Promise<Metadata> {
 export const viewport: Viewport = {
   themeColor: '#000000',
   viewportFit: 'cover',
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default async function RootLayout({
@@ -94,7 +98,7 @@ export default async function RootLayout({
       <head>
         <meta
           name='viewport'
-          content='width=device-width, initial-scale=1.0, viewport-fit=cover'
+          content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover'
         />
         <link rel='icon' href='/favicon-v2.ico' sizes='any' />
         <link rel='apple-touch-icon' href='/apple-touch-icon.png' />
