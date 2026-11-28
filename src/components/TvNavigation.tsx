@@ -49,7 +49,9 @@ export default function TvNavigation() {
     const isVisible = (el: HTMLElement): boolean => {
       const rect = el.getBoundingClientRect();
       if (rect.width <= 2 || rect.height <= 2) return false;
-      if (el.offsetParent === null) return false;
+      // position:fixed 的元素 offsetParent 恒为 null（播放舞台/抽屉就是固定定位），不能据此判隐藏
+      const isFixed = getComputedStyle(el).position === 'fixed';
+      if (el.offsetParent === null && !isFixed) return false;
       if (!isCard(el) && (rect.right <= 0 || rect.left >= window.innerWidth))
         return false;
       let node: HTMLElement | null = el;
@@ -77,6 +79,14 @@ export default function TvNavigation() {
       );
       const roots = overlayRoots();
       const visible = els.filter(isVisible);
+      // 选集抽屉打开时，焦点只在抽屉（和底部遥控条）里走，
+      // 否则满屏的播放舞台会把方向键"吸"过去
+      const openPanel = document.querySelector('.tv-panel.tv-open');
+      if (openPanel) {
+        return visible.filter(
+          (el) => openPanel.contains(el) || !!el.closest('.tv-player-bar')
+        );
+      }
       if (!roots.length) return visible;
       return visible.filter((el) =>
         roots.some((root) => root.contains(el) || root === el)
@@ -169,6 +179,11 @@ export default function TvNavigation() {
     const inPlayerBar = (el: HTMLElement | null) =>
       !!el?.closest('.tv-player-bar');
 
+    // 播放页的"舞台"（全屏视频区域）本身也是焦点目标：焦点停在这里时
+    // 左右=快退/快进，OK=播放/暂停，上下=跳到「选集/换源」按钮
+    const inPlayStage = (el: HTMLElement | null) =>
+      !!el?.closest('[data-tv-stage]');
+
     const seekBy = (delta: number) => {
       const video = document.querySelector<HTMLVideoElement>(
         '.art-video-player video'
@@ -182,19 +197,59 @@ export default function TvNavigation() {
       );
     };
 
-    // 遥控条里上下键在按钮之间循环（左右键被"快退/快进 15 秒"占用了）
-    const cycleBarButton = (step: number): boolean => {
-      const bar = currentRef.current?.closest('.tv-player-bar');
-      if (!bar) return false;
-      const btns = Array.from(
-        bar.querySelectorAll<HTMLElement>('.tv-bar-btn')
-      ).filter(isVisible);
-      if (btns.length < 2) return false;
-      const idx = btns.indexOf(currentRef.current as HTMLElement);
-      const from = idx < 0 ? 0 : idx;
-      const next = (from + step + btns.length) % btns.length;
-      focusEl(btns[next]);
+    // 连续按（遥控器长按）累加秒数，跟芒果/腾讯的快进提示一致
+    let lastSeekAt = 0;
+    let seekDirection: 'back' | 'forward' = 'forward';
+    let seekTotal = 0;
+    const seekWithHint = (delta: number) => {
+      const now = Date.now();
+      const dir = delta > 0 ? 'forward' : 'back';
+      if (now - lastSeekAt < 1500 && seekDirection === dir) {
+        seekTotal += Math.abs(delta);
+      } else {
+        seekDirection = dir;
+        seekTotal = Math.abs(delta);
+      }
+      lastSeekAt = now;
+      seekBy(delta);
+      window.dispatchEvent(
+        new CustomEvent('tv-seek', {
+          detail: { direction: dir, seconds: seekTotal },
+        })
+      );
+    };
+
+    // 点一下 OK：播放/暂停
+    const togglePlay = () => {
+      const video = document.querySelector<HTMLVideoElement>(
+        '.art-video-player video'
+      );
+      if (!video) return false;
+      if (video.paused) void video.play().catch(() => undefined);
+      else video.pause();
       return true;
+    };
+
+    // 上下键：舞台 <-> 遥控条按钮 之间来回
+    const jumpStageOrBar = (dir: Dir): boolean => {
+      const stage = document.querySelector<HTMLElement>('[data-tv-stage]');
+      const barBtn = document.querySelector<HTMLElement>(
+        '.tv-player-bar .tv-bar-btn'
+      );
+      if (!barBtn) return false;
+      const cur = currentRef.current;
+      if (cur && inPlayerBar(cur)) {
+        if (stage) {
+          focusEl(stage);
+          return true;
+        }
+        return false;
+      }
+      if (dir === 'down') {
+        focusEl(barBtn);
+        return true;
+      }
+      return false;
     };
 
     const changeVolumeBy = (delta: number) => {
@@ -235,13 +290,31 @@ export default function TvNavigation() {
         return;
       }
 
-      // 电视遥控条：左/右直接快退、快进 15 秒；上/下在按钮之间循环
-      if (inPlayerBar(current)) {
-        if (dir === 'left' || dir === 'right') {
-          seekBy(dir === 'left' ? -15 : 15);
+      // 播放页舞台：左右 = ±15 秒（带中央提示），上下 = 跳到「选集/换源」
+      if (inPlayStage(current)) {
+        if (dir === 'left') {
+          seekWithHint(-15);
           return;
         }
-        cycleBarButton(dir === 'down' ? 1 : -1);
+        if (dir === 'right') {
+          seekWithHint(15);
+          return;
+        }
+        if (jumpStageOrBar(dir)) return;
+        return;
+      }
+
+      // 遥控条：只有一个「选集/换源」按钮，左右仍然快退/快进，上下回舞台
+      if (inPlayerBar(current)) {
+        if (dir === 'left') {
+          seekWithHint(-15);
+          return;
+        }
+        if (dir === 'right') {
+          seekWithHint(15);
+          return;
+        }
+        jumpStageOrBar(dir);
         return;
       }
 
@@ -391,6 +464,34 @@ export default function TvNavigation() {
         tag === 'SELECT' ||
         !!target?.isContentEditable;
 
+      // 遥控器「返回」键：Android TV keyCode 4 / webOS 461 / Tizen 10009，
+      // 键名也可能是 Backspace、Escape、BrowserBack、GoBack 等
+      const backKeys = [
+        'Backspace',
+        'Escape',
+        'BrowserBack',
+        'GoBack',
+        'XF86Back',
+      ];
+      const isBackKey =
+        backKeys.includes(e.key) ||
+        e.keyCode === 4 ||
+        e.keyCode === 461 ||
+        e.keyCode === 10009;
+      if (isBackKey && !isTyping && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        // 选集/换源抽屉开着时，返回键只收起抽屉，不能直接退出观影页
+        if (document.querySelector('.tv-panel.tv-open')) {
+          window.dispatchEvent(new CustomEvent('tv-close-panel'));
+        } else if (window.history.length > 1) {
+          window.history.back();
+        } else {
+          window.location.href = '/';
+        }
+        return;
+      }
+
       switch (e.key) {
         case 'ArrowLeft':
           if (isTyping) return;
@@ -416,6 +517,11 @@ export default function TvNavigation() {
           if (isTyping) return;
           e.preventDefault();
           if (currentRef.current) {
+            // 焦点在播放舞台：OK 就是播放/暂停
+            if (inPlayStage(currentRef.current)) {
+              togglePlay();
+              return;
+            }
             // 全屏按钮必须由按键处理函数直接发起，不能走 click
             if (
               currentRef.current.classList.contains('art-control-fullscreen')
@@ -427,18 +533,6 @@ export default function TvNavigation() {
           } else {
             focusFirst();
           }
-          break;
-        case 'Backspace':
-          // Android TV 遥控器的返回键
-          if (isTyping || e.ctrlKey || e.metaKey) return;
-          e.preventDefault();
-          // 选集/换源抽屉开着时，返回键只收起抽屉，不能直接退出观影页
-          if (document.querySelector('.tv-panel.tv-open')) {
-            window.dispatchEvent(new CustomEvent('tv-close-panel'));
-            return;
-          }
-          if (window.history.length > 1) window.history.back();
-          else window.location.href = '/';
           break;
         case 'MediaPlayPause':
         case ' ': {

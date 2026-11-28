@@ -28,6 +28,7 @@ import { getVideoResolutionFromM3u8, processImageUrl } from '@/lib/utils';
 import EpisodeSelector from '@/components/EpisodeSelector';
 import PageLayout from '@/components/PageLayout';
 import TvPlayerBar from '@/components/TvPlayerBar';
+import TvSeekHud from '@/components/TvSeekHud';
 
 // 扩展 HTMLVideoElement 类型以支持 hls 属性
 declare global {
@@ -812,6 +813,33 @@ function PlayPageClient() {
     initSkipConfig();
   }, []);
 
+  // 抽屉打开时的历史记录守卫（应对电视返回键不发 keydown、直接 history.back 的情况）
+  const panelGuardRef = useRef(false);
+  const pushPanelHistoryGuard = () => {
+    if (panelGuardRef.current) return;
+    panelGuardRef.current = true;
+    window.history.pushState({ tvPanelGuard: 1 }, '', window.location.href);
+  };
+  const dropPanelHistoryGuard = () => {
+    if (!panelGuardRef.current) return Promise.resolve();
+    panelGuardRef.current = false;
+    const target = window.history;
+    // 等 history 真正回退完成再继续后续动作（换源会改 URL，早改会被这次回退覆盖）
+    return new Promise<void>((resolve) => {
+      let finished = false;
+      const finish = () => {
+        if (finished) return;
+        finished = true;
+        window.clearTimeout(timer);
+        window.removeEventListener('popstate', finish);
+        resolve();
+      };
+      const timer = window.setTimeout(finish, 500);
+      window.addEventListener('popstate', finish);
+      target.back();
+    });
+  };
+
   // 电视端抽屉开/收：焦点跟着走，并保证开关抽屉本身不会把视频弄停
   const setTvPanelOpenWithFocus = (next: boolean) => {
     const v = document.querySelector<HTMLVideoElement>(
@@ -819,6 +847,7 @@ function PlayPageClient() {
     );
     if (next) {
       tvWasPlayingRef.current = !!v && !v.paused;
+      pushPanelHistoryGuard();
     } else if (tvWasPlayingRef.current && v && v.paused) {
       // 之前正在播，收起抽屉后接着播
       window.setTimeout(() => {
@@ -826,10 +855,12 @@ function PlayPageClient() {
       }, 200);
     }
     setTvPanelOpen(next);
+    if (!next) void dropPanelHistoryGuard();
     window.setTimeout(() => {
       window.dispatchEvent(
         new CustomEvent('tv-focus-first', {
-          detail: next ? '.tv-panel' : '.tv-player-bar',
+          // 收起抽屉后焦点回到播放舞台（不落在按钮上，屏幕上就不会一直有蓝框）
+          detail: next ? '.tv-panel' : '[data-tv-stage]',
         })
       );
     }, 260);
@@ -849,17 +880,40 @@ function PlayPageClient() {
       );
   }, [isTvMode, tvPanelOpen]);
 
-  const closeTvPanelAfterChoice = () => {
+  // 有些电视/WebView 的返回键根本不发 keydown，直接在浏览器层面 history.back，
+  // 所以抽屉打开时压一条同 URL 的历史记录：返回键只会把这条记录弹掉，
+  // 页面不跳走，我们收到 popstate 后把抽屉收起就行。
+  useEffect(() => {
     if (!isTvMode) return;
+    const onPopState = () => {
+      if (!panelGuardRef.current) return;
+      panelGuardRef.current = false; // 这条守卫记录已被浏览器消费
+      if (tvPanelOpen) {
+        setTvPanelOpen(false);
+        window.setTimeout(() => {
+          window.dispatchEvent(
+            new CustomEvent('tv-focus-first', { detail: '[data-tv-stage]' })
+          );
+        }, 260);
+      }
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [isTvMode, tvPanelOpen]);
+
+  const closeTvPanelAfterChoice = () => {
+    if (!isTvMode) return Promise.resolve();
     // 选完集数/源期望直接接着播
     resumePlayAfterLoadRef.current = true;
     tvWasPlayingRef.current = true;
     setTvPanelOpen(false);
+    const dropped = dropPanelHistoryGuard();
     window.setTimeout(() => {
       window.dispatchEvent(
-        new CustomEvent('tv-focus-first', { detail: '.tv-player-bar' })
+        new CustomEvent('tv-focus-first', { detail: '[data-tv-stage]' })
       );
     }, 260);
+    return dropped;
   };
 
   const handleSourceChange = async (
@@ -869,7 +923,8 @@ function PlayPageClient() {
   ) => {
     try {
       // 电视端选完源后收起抽屉，焦点回到遥控条
-      closeTvPanelAfterChoice();
+      // 等历史守卫回退完成再改 URL，否则新的 source 参数会被回退覆盖
+      await closeTvPanelAfterChoice();
       // 显示换源加载状态
       setVideoLoadingStage('sourceChanging');
       setIsVideoLoading(true);
@@ -1916,17 +1971,10 @@ function PlayPageClient() {
         <TvPlayerBar
           panelOpen={tvPanelOpen}
           onTogglePanel={() => setTvPanelOpenWithFocus(!tvPanelOpen)}
-          onBack={() => {
-            // 抽屉开着时，"返回"先收起抽屉，不要直接退出观影
-            if (tvPanelOpen) {
-              setTvPanelOpenWithFocus(false);
-              return;
-            }
-            if (window.history.length > 1) window.history.back();
-            else window.location.href = '/';
-          }}
         />
       )}
+      {/* 遥控器快退/快进时，荧幕中央的「快进 15 秒」提示 */}
+      {isTvMode && <TvSeekHud />}
       <div className='flex flex-col gap-3 py-4 px-5 lg:px-[3rem] 2xl:px-20'>
         {/* 第一行：影片标题 */}
         <div className='py-1'>
@@ -2001,6 +2049,13 @@ function PlayPageClient() {
                     ? 'relative w-full h-full tv-overlay tv-play-stage'
                     : 'relative w-full h-[300px] lg:h-full'
                 }
+                {...(isTvMode
+                  ? {
+                      'data-tv-stage': '',
+                      'data-tv-control': '',
+                      'data-tv-autofocus': '',
+                    }
+                  : {})}
               >
                 <div
                   ref={artRef}
