@@ -166,6 +166,9 @@ export default function TvNavigation() {
     const inPlayer = (el: HTMLElement | null) =>
       !!el?.closest('.art-video-player');
 
+    const inPlayerBar = (el: HTMLElement | null) =>
+      !!el?.closest('.tv-player-bar');
+
     const seekBy = (delta: number) => {
       const video = document.querySelector<HTMLVideoElement>(
         '.art-video-player video'
@@ -177,6 +180,21 @@ export default function TvNavigation() {
         0,
         duration > 0 ? Math.min(duration - 1, next) : next
       );
+    };
+
+    // 遥控条里上下键在按钮之间循环（左右键被"快退/快进 15 秒"占用了）
+    const cycleBarButton = (step: number): boolean => {
+      const bar = currentRef.current?.closest('.tv-player-bar');
+      if (!bar) return false;
+      const btns = Array.from(
+        bar.querySelectorAll<HTMLElement>('.tv-bar-btn')
+      ).filter(isVisible);
+      if (btns.length < 2) return false;
+      const idx = btns.indexOf(currentRef.current as HTMLElement);
+      const from = idx < 0 ? 0 : idx;
+      const next = (from + step + btns.length) % btns.length;
+      focusEl(btns[next]);
+      return true;
     };
 
     const changeVolumeBy = (delta: number) => {
@@ -217,15 +235,25 @@ export default function TvNavigation() {
         return;
       }
 
-      // 播放器控制条内：进度条左右拖时间、音量按钮左右调音量
+      // 电视遥控条：左/右直接快退、快进 15 秒；上/下在按钮之间循环
+      if (inPlayerBar(current)) {
+        if (dir === 'left' || dir === 'right') {
+          seekBy(dir === 'left' ? -15 : 15);
+          return;
+        }
+        cycleBarButton(dir === 'down' ? 1 : -1);
+        return;
+      }
+
+      // 极少数情况下焦点落在播放器自带控制条（旧逻辑保留，电视端已隐藏该条）
       if (inPlayer(current)) {
         if (current.classList.contains('art-control-progress')) {
           if (dir === 'left') {
-            seekBy(-10);
+            seekBy(-15);
             return;
           }
           if (dir === 'right') {
-            seekBy(10);
+            seekBy(15);
             return;
           }
         }
@@ -404,6 +432,11 @@ export default function TvNavigation() {
           // Android TV 遥控器的返回键
           if (isTyping || e.ctrlKey || e.metaKey) return;
           e.preventDefault();
+          // 选集/换源抽屉开着时，返回键只收起抽屉，不能直接退出观影页
+          if (document.querySelector('.tv-panel.tv-open')) {
+            window.dispatchEvent(new CustomEvent('tv-close-panel'));
+            return;
+          }
           if (window.history.length > 1) window.history.back();
           else window.location.href = '/';
           break;

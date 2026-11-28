@@ -3,15 +3,18 @@
 import { useEffect, useState } from 'react';
 
 /**
- * 电视端播放页底部遥控条。
- * - 不依赖 ArtPlayer 自带控制条（那条在电视上只能鼠标用），全部改用原生按钮，
- *   遥控器方向键直接选，OK 键触发 React onClick，天然可靠。
+ * 电视端播放页底部遥控条（精简版）。
+ * - 只保留必要按钮：播放/暂停、合集、返回。
+ * - 音量交给电视遥控器本身，不再占按钮。
+ * - 快退/快进改由方向键左/右直接触发（±15 秒），不再占按钮。
+ * - 按钮都是原生 button，遥控器 OK 触发 React onClick，比 ArtPlayer 自带控制条可靠。
  * - 只在 tv-mode（TvNavigation 打上的 body class）下渲染。
  */
 
 interface Props {
   panelOpen: boolean;
   onTogglePanel: () => void;
+  onBack: () => void;
 }
 
 const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
@@ -24,11 +27,14 @@ const fmt = (sec: number) => {
   return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
 };
 
-export default function TvPlayerBar({ panelOpen, onTogglePanel }: Props) {
+export default function TvPlayerBar({
+  panelOpen,
+  onTogglePanel,
+  onBack,
+}: Props) {
   const [playing, setPlaying] = useState(false);
   const [current, setCurrent] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(1);
 
   const getVideo = () =>
     document.querySelector<HTMLVideoElement>('.art-video-player video');
@@ -40,7 +46,6 @@ export default function TvPlayerBar({ panelOpen, onTogglePanel }: Props) {
       setPlaying(!v.paused);
       setCurrent(v.currentTime || 0);
       setDuration(Number.isFinite(v.duration) ? v.duration : 0);
-      setVolume(v.muted ? 0 : v.volume);
     }, 500);
     return () => window.clearInterval(timer);
   }, []);
@@ -52,23 +57,7 @@ export default function TvPlayerBar({ panelOpen, onTogglePanel }: Props) {
     else v.pause();
   };
 
-  const seek = (delta: number) => {
-    const v = getVideo();
-    if (!v) return;
-    const dur = Number.isFinite(v.duration) ? v.duration : 0;
-    const next = v.currentTime + delta;
-    v.currentTime = Math.max(0, dur > 0 ? Math.min(dur - 1, next) : next);
-  };
-
-  const changeVolume = (delta: number) => {
-    const v = getVideo();
-    if (!v) return;
-    v.muted = false;
-    v.volume = Math.max(0, Math.min(1, v.volume + delta));
-  };
-
   const percent = duration > 0 ? Math.min(100, (current / duration) * 100) : 0;
-
   const iconCls = 'w-6 h-6';
 
   return (
@@ -98,65 +87,11 @@ export default function TvPlayerBar({ panelOpen, onTogglePanel }: Props) {
         <span>{playing ? '暂停' : '播放'}</span>
       </button>
 
-      <button
-        type='button'
-        data-tv-control
-        className='tv-bar-btn'
-        onClick={() => seek(-10)}
-        title='快退 10 秒'
-      >
-        <svg className={iconCls} viewBox='0 0 24 24' fill='currentColor'>
-          <path d='M11 6v12L2 12z' />
-          <path d='M16 6h2v12h-2z' />
-        </svg>
-        <span>-10 秒</span>
-      </button>
-
-      <button
-        type='button'
-        data-tv-control
-        className='tv-bar-btn'
-        onClick={() => seek(10)}
-        title='快进 10 秒'
-      >
-        <svg className={iconCls} viewBox='0 0 24 24' fill='currentColor'>
-          <path d='M13 6v12l9-6z' />
-          <path d='M6 6h2v12H6z' />
-        </svg>
-        <span>+10 秒</span>
-      </button>
-
-      <button
-        type='button'
-        data-tv-control
-        className='tv-bar-btn'
-        onClick={() => changeVolume(-0.1)}
-        title='音量减'
-      >
-        <svg className={iconCls} viewBox='0 0 24 24' fill='currentColor'>
-          <path d='M4 9h4l4-4v14l-4-4H4z' />
-          <path d='M16 11h6v2h-6z' />
-        </svg>
-        <span>音量 -</span>
-      </button>
-
-      <button
-        type='button'
-        data-tv-control
-        className='tv-bar-btn'
-        onClick={() => changeVolume(0.1)}
-        title='音量加'
-      >
-        <svg className={iconCls} viewBox='0 0 24 24' fill='currentColor'>
-          <path d='M4 9h4l4-4v14l-4-4H4z' />
-          <path d='M14 11h2v-2h2v2h2v2h-2v2h-2v-2h-2z' />
-        </svg>
-        <span>{`音量 ${Math.round(volume * 100)}`}</span>
-      </button>
-
       <span className='tv-bar-time'>
         {fmt(current)} / {fmt(duration)}
       </span>
+
+      <span className='tv-bar-hint'>左右键 快退 / 快进 15 秒</span>
 
       <div className='flex-1' />
 
@@ -177,10 +112,7 @@ export default function TvPlayerBar({ panelOpen, onTogglePanel }: Props) {
         type='button'
         data-tv-control
         className='tv-bar-btn'
-        onClick={() => {
-          if (window.history.length > 1) window.history.back();
-          else window.location.href = '/';
-        }}
+        onClick={onBack}
         title='返回'
       >
         <svg className={iconCls} viewBox='0 0 24 24' fill='currentColor'>

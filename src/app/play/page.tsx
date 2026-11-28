@@ -201,6 +201,10 @@ function PlayPageClient() {
   // 电视端：默认全屏播放 + 底部遥控条 + 选集/换源抽屉
   const [isTvMode, setIsTvMode] = useState(false);
   const [tvPanelOpen, setTvPanelOpen] = useState(false);
+  // 打开抽屉前是否正在播放；抽屉关掉后按这个恢复，避免"开一次列表就停住"
+  const tvWasPlayingRef = useRef(false);
+  // 换源/换集后需要自动接着播（重建播放器后 autoplay 会被浏览器拦掉）
+  const resumePlayAfterLoadRef = useRef(false);
 
   // 换源加载状态
   const [isVideoLoading, setIsVideoLoading] = useState(true);
@@ -808,11 +812,48 @@ function PlayPageClient() {
     initSkipConfig();
   }, []);
 
-  // 处理换源
-  // 电视端：选完集数/源后自动收起抽屉，并把遥控焦点送回底部遥控条，
-  // 否则列表重新渲染会把焦点丢掉（focus 消失，方向键就像没反应）
+  // 电视端抽屉开/收：焦点跟着走，并保证开关抽屉本身不会把视频弄停
+  const setTvPanelOpenWithFocus = (next: boolean) => {
+    const v = document.querySelector<HTMLVideoElement>(
+      '.art-video-player video'
+    );
+    if (next) {
+      tvWasPlayingRef.current = !!v && !v.paused;
+    } else if (tvWasPlayingRef.current && v && v.paused) {
+      // 之前正在播，收起抽屉后接着播
+      window.setTimeout(() => {
+        if (v.paused) void v.play().catch(() => undefined);
+      }, 200);
+    }
+    setTvPanelOpen(next);
+    window.setTimeout(() => {
+      window.dispatchEvent(
+        new CustomEvent('tv-focus-first', {
+          detail: next ? '.tv-panel' : '.tv-player-bar',
+        })
+      );
+    }, 260);
+  };
+
+  // 遥控"返回"键在抽屉打开时只收抽屉（TvNavigation 派发 tv-close-panel）
+  useEffect(() => {
+    if (!isTvMode) return;
+    const onClosePanel = () => {
+      if (tvPanelOpen) setTvPanelOpenWithFocus(false);
+    };
+    window.addEventListener('tv-close-panel', onClosePanel as EventListener);
+    return () =>
+      window.removeEventListener(
+        'tv-close-panel',
+        onClosePanel as EventListener
+      );
+  }, [isTvMode, tvPanelOpen]);
+
   const closeTvPanelAfterChoice = () => {
     if (!isTvMode) return;
+    // 选完集数/源期望直接接着播
+    resumePlayAfterLoadRef.current = true;
+    tvWasPlayingRef.current = true;
     setTvPanelOpen(false);
     window.setTimeout(() => {
       window.dispatchEvent(
@@ -1656,6 +1697,32 @@ function PlayPageClient() {
         );
       }
 
+      // 换源/换集后重建播放器时 autoplay 常被浏览器拦掉：持续尝试恢复播放，
+      // 直到真的播起来或超过 ~15 秒（否则用户切完源画面停住，还得再按一次播放）
+      if (resumePlayAfterLoadRef.current) {
+        let resumeTries = 0;
+        const resumeTimer = window.setInterval(() => {
+          if (!resumePlayAfterLoadRef.current) {
+            window.clearInterval(resumeTimer);
+            return;
+          }
+          const video = document.querySelector<HTMLVideoElement>(
+            '.art-video-player video'
+          );
+          if (video && !video.paused) {
+            window.clearInterval(resumeTimer);
+            resumePlayAfterLoadRef.current = false;
+            return;
+          }
+          if (video) void video.play().catch(() => undefined);
+          resumeTries += 1;
+          if (resumeTries > 15) {
+            window.clearInterval(resumeTimer);
+            resumePlayAfterLoadRef.current = false;
+          }
+        }, 1000);
+      }
+
       // 启动加载超时检测：12 秒没开始播放就自动切源
       hasStartedPlayingRef.current = false;
       if (loadTimeoutRef.current) {
@@ -1848,16 +1915,15 @@ function PlayPageClient() {
       {isTvMode && (
         <TvPlayerBar
           panelOpen={tvPanelOpen}
-          onTogglePanel={() => {
-            const next = !tvPanelOpen;
-            setTvPanelOpen(next);
-            window.setTimeout(() => {
-              window.dispatchEvent(
-                new CustomEvent('tv-focus-first', {
-                  detail: next ? '.tv-panel' : '.tv-player-bar',
-                })
-              );
-            }, 280);
+          onTogglePanel={() => setTvPanelOpenWithFocus(!tvPanelOpen)}
+          onBack={() => {
+            // 抽屉开着时，"返回"先收起抽屉，不要直接退出观影
+            if (tvPanelOpen) {
+              setTvPanelOpenWithFocus(false);
+              return;
+            }
+            if (window.history.length > 1) window.history.back();
+            else window.location.href = '/';
           }}
         />
       )}

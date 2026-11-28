@@ -368,6 +368,12 @@ div[data-media-provider] video {
   white-space: nowrap;
 }
 
+.tv-mode .tv-player-bar .tv-bar-hint {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 14px;
+  white-space: nowrap;
+}
+
 .tv-mode .tv-bar-btn {
   display: flex;
   align-items: center;
