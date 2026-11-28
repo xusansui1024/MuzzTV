@@ -9,15 +9,7 @@ import { useEffect, useRef, useState } from 'react';
  */
 export default function TvExitDialog() {
   const [open, setOpen] = useState(false);
-  const [tvMode, setTvMode] = useState(false);
   const cancelRef = useRef<HTMLButtonElement | null>(null);
-
-  useEffect(() => {
-    setTvMode(
-      document.documentElement.classList.contains('tv-mode') ||
-        document.body.classList.contains('tv-mode')
-    );
-  }, []);
 
   useEffect(() => {
     const onRequest = () => setOpen(true);
@@ -42,7 +34,25 @@ export default function TvExitDialog() {
     return () => window.clearTimeout(t);
   }, [open]);
 
-  if (!open || !tvMode) return null;
+  // 不做"挂载时读一次"的 TV 模式判断：TvNavigation 会在自己的 effect 里才给
+  // <html> 加 tv-mode，早于它的组件读到的永远是 false，弹窗就再也不会出现。
+  // 这里改成弹窗真正打开时再判定，保证遥控器一按返回就能看到退出框。
+  const inTvMode = () => {
+    if (typeof document === 'undefined') return false;
+    if (
+      document.documentElement.classList.contains('tv-mode') ||
+      document.body.classList.contains('tv-mode')
+    ) {
+      return true;
+    }
+    try {
+      return new URLSearchParams(window.location.search).has('tv');
+    } catch {
+      return false;
+    }
+  };
+
+  if (!open || !inTvMode()) return null;
 
   const close = () => {
     setOpen(false);

@@ -662,7 +662,7 @@ export default function TvNavigation() {
       }
     };
 
-    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keydown', onKeyDown, { capture: true });
     window.addEventListener('tv-focus-first', onFocusRequest as EventListener);
     window.addEventListener('popstate', onRouteChange);
     // Next.js App Router 下监听文档可见性变化重新聚焦（页面切换后 DOM 替换）
@@ -690,7 +690,7 @@ export default function TvNavigation() {
       window.clearTimeout(timer);
       window.clearInterval(markTimer);
       window.clearInterval(focusGuardTimer);
-      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keydown', onKeyDown, { capture: true });
       window.removeEventListener(
         'tv-focus-first',
         onFocusRequest as EventListener
