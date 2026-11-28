@@ -1,10 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/exhaustive-deps, no-console */
 'use client';
 
-import Announcement from '@/components/Announcement';
 import { ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { Suspense, useEffect, useState } from 'react';
+
 import {
   clearAllFavorites,
   getAllFavorites,
@@ -13,6 +13,8 @@ import {
 } from '@/lib/db.client';
 import { getDoubanCategories } from '@/lib/douban.client';
 import { DoubanItem } from '@/lib/types';
+
+import Announcement from '@/components/Announcement';
 import CapsuleSwitch from '@/components/CapsuleSwitch';
 import ContinueWatching from '@/components/ContinueWatching';
 import PageLayout from '@/components/PageLayout';
@@ -35,7 +37,11 @@ function HomeClient() {
       try {
         setLoading(true);
         const [moviesData, tvShowsData, varietyShowsData] = await Promise.all([
-          getDoubanCategories({ kind: 'movie', category: '热门', type: '全部' }),
+          getDoubanCategories({
+            kind: 'movie',
+            category: '热门',
+            type: '全部',
+          }),
           getDoubanCategories({ kind: 'tv', category: 'tv', type: 'tv' }),
           getDoubanCategories({ kind: 'tv', category: 'show', type: 'show' }),
         ]);
@@ -79,7 +85,10 @@ function HomeClient() {
       await updateFavoriteItems(allFavorites);
     };
     loadFavorites();
-    const unsubscribe = subscribeToDataUpdates('favoritesUpdated', updateFavoriteItems);
+    const unsubscribe = subscribeToDataUpdates(
+      'favoritesUpdated',
+      updateFavoriteItems
+    );
     return unsubscribe;
   }, [activeTab]);
 
@@ -89,7 +98,7 @@ function HomeClient() {
       <Announcement announcement={announcement} />
 
       <div className='px-2 sm:px-10 py-4 sm:py-8 overflow-visible'>
-        <div className='mb-8 flex justify-center'>
+        <div className='mb-8 flex justify-center' data-tv-hide='1'>
           <CapsuleSwitch
             options={[
               { label: '首页', value: 'home' },
@@ -104,13 +113,30 @@ function HomeClient() {
           {activeTab === 'favorites' ? (
             <section className='mb-8'>
               <div className='mb-4 flex items-center justify-between'>
-                <h2 className='text-xl font-bold text-gray-800 dark:text-gray-200'>我的收藏</h2>
-                {favoriteItems.length > 0 && <button className='text-sm text-gray-500 hover:text-gray-700' onClick={async () => { await clearAllFavorites(); setFavoriteItems([]); }}>清空</button>}
+                <h2 className='text-xl font-bold text-gray-800 dark:text-gray-200'>
+                  我的收藏
+                </h2>
+                {favoriteItems.length > 0 && (
+                  <button
+                    className='text-sm text-gray-500 hover:text-gray-700'
+                    onClick={async () => {
+                      await clearAllFavorites();
+                      setFavoriteItems([]);
+                    }}
+                  >
+                    清空
+                  </button>
+                )}
               </div>
               <div className='justify-start grid grid-cols-3 gap-x-2 gap-y-14 sm:gap-y-20 px-0 sm:px-2 sm:grid-cols-[repeat(auto-fill,_minmax(11rem,_1fr))] sm:gap-x-8'>
                 {favoriteItems.map((item) => (
                   <div key={item.id + item.source} className='w-full'>
-                    <VideoCard query={item.search_title} {...item} from='favorite' type={item.episodes > 1 ? 'tv' : ''} />
+                    <VideoCard
+                      query={item.search_title}
+                      {...item}
+                      from='favorite'
+                      type={item.episodes > 1 ? 'tv' : ''}
+                    />
                   </div>
                 ))}
               </div>
@@ -122,22 +148,44 @@ function HomeClient() {
               {[
                 { title: '热门电影', data: hotMovies, type: 'movie' },
                 { title: '热门剧集', data: hotTvShows, type: 'tv' },
-                { title: '热门综艺', data: hotVarietyShows, type: 'show' }
+                { title: '热门综艺', data: hotVarietyShows, type: 'show' },
               ].map((section, idx) => (
                 <section key={idx} className='mb-8'>
                   <div className='mb-4 flex items-center justify-between'>
-                    <h2 className='text-xl font-bold text-gray-800 dark:text-gray-200'>{section.title}</h2>
-                    <Link href={`/douban?type=${section.type}`} className='flex items-center text-sm text-gray-500 hover:text-gray-700'>
+                    <h2 className='text-xl font-bold text-gray-800 dark:text-gray-200'>
+                      {section.title}
+                    </h2>
+                    <Link
+                      href={`/douban?type=${section.type}`}
+                      className='flex items-center text-sm text-gray-500 hover:text-gray-700'
+                    >
                       查看更多 <ChevronRight className='w-4 h-4 ml-1' />
                     </Link>
                   </div>
                   <ScrollableRow>
-                    {loading ? Array.from({ length: 8 }).map((_, i) => <div key={i} className='min-w-[96px] w-24 sm:min-w-[180px] sm:w-44 h-60 bg-gray-200 rounded-lg animate-pulse'></div>)
+                    {loading
+                      ? Array.from({ length: 8 }).map((_, i) => (
+                          <div
+                            key={i}
+                            className='min-w-[96px] w-24 sm:min-w-[180px] sm:w-44 h-60 bg-gray-200 rounded-lg animate-pulse'
+                          ></div>
+                        ))
                       : section.data.map((item, i) => (
-                        <div key={i} className='min-w-[96px] w-24 sm:min-w-[180px] sm:w-44'>
-                          <VideoCard from='douban' title={item.title} poster={item.poster} douban_id={item.id} rate={item.rate} year={item.year} type={section.type} />
-                        </div>
-                      ))}
+                          <div
+                            key={i}
+                            className='min-w-[96px] w-24 sm:min-w-[180px] sm:w-44'
+                          >
+                            <VideoCard
+                              from='douban'
+                              title={item.title}
+                              poster={item.poster}
+                              douban_id={item.id}
+                              rate={item.rate}
+                              year={item.year}
+                              type={section.type}
+                            />
+                          </div>
+                        ))}
                   </ScrollableRow>
                 </section>
               ))}
@@ -150,5 +198,9 @@ function HomeClient() {
 }
 
 export default function Home() {
-  return <Suspense><HomeClient /></Suspense>;
+  return (
+    <Suspense>
+      <HomeClient />
+    </Suspense>
+  );
 }

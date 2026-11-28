@@ -194,6 +194,12 @@ div[data-media-provider] video {
   cursor: none;
 }
 
+/* 电视端隐藏纯鼠标入口：侧边栏折叠按钮、首页/收藏夹胶囊、下载客户端按钮。
+   遥控器用不到这些，留着反而占焦点、挡画面 */
+.tv-mode [data-tv-hide] {
+  display: none !important;
+}
+
 /* 遥控焦点高亮（不使用 scale，避免改变布局位置干扰导航计算） */
 .tv-mode .tv-focused {
   outline: 3px solid #38bdf8 !important;

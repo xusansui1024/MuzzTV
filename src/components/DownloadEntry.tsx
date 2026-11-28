@@ -51,6 +51,7 @@ const DownloadEntry = ({ variant = 'desktop' }: DownloadEntryProps) => {
     return (
       <div
         className='relative'
+        data-tv-hide='1'
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       >
