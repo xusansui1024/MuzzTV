@@ -179,7 +179,9 @@ export async function GET(): Promise<NextResponse> {
 
   return NextResponse.json(response, {
     headers: {
-      'Cache-Control': `public, max-age=${effectiveCache}, s-maxage=${effectiveCache}`,
+      // 浏览器端不缓存（只做 0 秒直用+回源校验），避免用户长期看到旧列表；
+      // CDN 端仍按站点配置缓存，保证冷启动不会被反复打爆
+      'Cache-Control': 'public, max-age=0, must-revalidate',
       'CDN-Cache-Control': `public, s-maxage=${effectiveCache}`,
       'Vercel-CDN-Cache-Control': `public, s-maxage=${effectiveCache}`,
     },

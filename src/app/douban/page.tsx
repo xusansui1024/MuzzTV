@@ -112,9 +112,11 @@ function DoubanPageClient() {
           // 泰剧走后端聚合接口（/api/douban/thailand）：
           // 12 个关键词 × 20 个源在服务器端并行搜索、过滤、去重后一次返回，
           // 浏览器只需 1 次请求，避免原来 12 个搜索请求逐个等待造成卡顿。
-          const data = await fetch('/api/douban/thailand').then((r) =>
-            r.json()
-          );
+          // 带版本参数的 URL 用于绕开 CDN / 浏览器里按 URL 缓存的旧数据
+          // （评分接入前的那版列表会长期命中旧缓存，导致卡片看不到分数）
+          const data = await fetch('/api/douban/thailand?ver=20261128rate', {
+            cache: 'no-store',
+          }).then((r) => r.json());
           if (data.code === 200) rawList = data.list;
         } else if (custom) {
           const data = await getDoubanList({
