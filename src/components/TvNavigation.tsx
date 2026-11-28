@@ -674,22 +674,51 @@ export default function TvNavigation() {
           move('down');
           break;
         case 'Enter':
-          if (isTyping) return;
+          // 焦点在输入框时，OK（确定键）= 提交所在表单（搜索框按确定要能搜）
+          if (isTyping) {
+            const el = target as HTMLInputElement | null;
+            const tag = el?.tagName;
+            const type = (el as HTMLInputElement)?.type || 'text';
+            if (
+              el &&
+              (tag === 'INPUT' || tag === 'TEXTAREA') &&
+              el.form &&
+              !e.isComposing &&
+              type !== 'checkbox' &&
+              type !== 'radio' &&
+              el.value.trim()
+            ) {
+              e.preventDefault();
+              el.form.requestSubmit();
+            }
+            return;
+          }
           e.preventDefault();
           if (currentRef.current) {
+            const el = currentRef.current;
             // 焦点在播放舞台：OK 就是播放/暂停
-            if (inPlayStage(currentRef.current)) {
+            if (inPlayStage(el)) {
               togglePlay();
               return;
             }
             // 全屏按钮必须由按键处理函数直接发起，不能走 click
-            if (
-              currentRef.current.classList.contains('art-control-fullscreen')
-            ) {
+            if (el.classList.contains('art-control-fullscreen')) {
               togglePlayerFullscreen();
               return;
             }
-            currentRef.current.click();
+            // 搜索框等输入控件：OK = 提交表单（输入框本身 click 不会有反应）；
+            // 还没输入内容时先把光标放进去，交给系统输入法
+            const tag = el.tagName;
+            if (tag === 'INPUT' || tag === 'TEXTAREA') {
+              const input = el as HTMLInputElement;
+              if (input.value.trim() && input.form) {
+                input.form.requestSubmit();
+              } else {
+                input.focus();
+              }
+              return;
+            }
+            el.click();
           } else {
             focusFirst();
           }
