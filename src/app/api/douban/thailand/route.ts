@@ -5,6 +5,8 @@ import { isBlockedContent } from '@/lib/contentFilter';
 import { normalizeTitle } from '@/lib/normalizeTitle';
 import { DoubanItem, DoubanResult } from '@/lib/types';
 
+import thaiRates from '@/data/thai-rates.json';
+
 export const runtime = 'edge';
 
 interface ApiSiteItem {
@@ -17,8 +19,17 @@ interface ResourceItem {
   title: string;
   poster: string;
   year: string;
-  doubanId: string;
 }
+
+interface RateSnapshot {
+  items: Array<{ title: string; rate: string }>;
+}
+
+// 豆瓣评分快照：豆瓣只对国内 IP 开放，Vercel 边缘节点直连会被挡，
+// 所以评分由脚本在本地跑好后写进 src/data/thai-rates.json，随代码一起部署
+const RATE_MAP = new Map(
+  ((thaiRates as RateSnapshot).items || []).map((v) => [v.title, v.rate])
+);
 
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
@@ -98,58 +109,8 @@ async function fetchThaiPage(
       title: String(v.vod_name || '').trim(),
       poster: String(v.vod_pic || '').trim(),
       year: String(v.vod_year || '').trim(),
-      doubanId: String(v.vod_douban_id || '').trim(),
     }))
     .filter((v) => v.title);
-}
-
-/**
- * 评分：各源条目几乎都带 vod_douban_id，用它直接查豆瓣评分。
- * 新剧豆瓣可能还没出分（返回空），这种情况就不显示角标。
- * 整段限时 12 秒、并发 12，超时或失败都当没有评分，不影响列表本身。
- */
-const RATE_TIMEOUT_MS = 4500;
-const RATE_CONCURRENCY = 12;
-const RATE_DEADLINE_MS = 12000;
-
-async function fetchDoubanRate(id: string): Promise<string> {
-  const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), RATE_TIMEOUT_MS);
-  try {
-    const res = await fetch(
-      `https://movie.douban.com/j/subject_abstract?subject_id=${id}`,
-      {
-        signal: ctl.signal,
-        headers: {
-          'User-Agent': UA,
-          Referer: 'https://movie.douban.com/',
-          Accept: 'application/json',
-        },
-      }
-    );
-    if (!res.ok) return '';
-    const data = (await res.json()) as {
-      subject?: { rate?: string };
-    };
-    return String(data.subject?.rate || '');
-  } catch {
-    return '';
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-async function attachRates(items: Array<{ doubanId: string; rate: string }>) {
-  const queue = items.filter((i) => i.doubanId);
-  const deadline = Date.now() + RATE_DEADLINE_MS;
-  let cursor = 0;
-  const worker = async () => {
-    while (cursor < queue.length && Date.now() < deadline) {
-      const item = queue[cursor++];
-      item.rate = await fetchDoubanRate(item.doubanId);
-    }
-  };
-  await Promise.all(Array.from({ length: RATE_CONCURRENCY }, () => worker()));
 }
 
 export async function GET(): Promise<NextResponse> {
@@ -188,12 +149,10 @@ export async function GET(): Promise<NextResponse> {
       else if (!prev.year && item.year) prev.year = item.year;
       // 封面缺失时也用别家的补
       else if (!prev.poster && item.poster) prev.poster = item.poster;
-      // 豆瓣 id 同理，用来查评分
-      else if (!prev.doubanId && item.doubanId) prev.doubanId = item.doubanId;
     });
   });
 
-  const shaped = Array.from(merged.values())
+  const list: DoubanItem[] = Array.from(merged.values())
     .sort((a, b) => {
       const ya = Number(String(a.year).slice(0, 4)) || 0;
       const yb = Number(String(b.year).slice(0, 4)) || 0;
@@ -205,19 +164,8 @@ export async function GET(): Promise<NextResponse> {
       title: item.title,
       poster: item.poster,
       year: item.year,
-      doubanId: item.doubanId,
-      rate: '',
+      rate: RATE_MAP.get(item.title) || '',
     }));
-
-  await attachRates(shaped);
-
-  const list: DoubanItem[] = shaped.map((item) => ({
-    id: item.id,
-    title: item.title,
-    poster: item.poster,
-    year: item.year,
-    rate: item.rate,
-  }));
 
   const cacheTime = await getCacheTime();
   // 空结果只短缓存，避免源接口偶发故障导致长时间空列表
