@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
+
 import { getCacheTime } from '@/lib/config';
+import { isBlockedContent } from '@/lib/contentFilter';
 import { DoubanItem, DoubanResult } from '@/lib/types';
 
 interface DoubanApiResponse {
@@ -18,9 +20,10 @@ async function fetchDoubanData(url: string): Promise<DoubanApiResponse> {
   const fetchOptions = {
     signal: controller.signal,
     headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-      'Referer': 'https://movie.douban.com/',
-      'Accept': 'application/json, text/plain, */*',
+      'User-Agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+      Referer: 'https://movie.douban.com/',
+      Accept: 'application/json, text/plain, */*',
     },
   };
 
@@ -55,24 +58,28 @@ export async function GET(request: Request) {
   // 这里只使用 tag 参数，因为 search_subjects 接口只支持 tag
   let finalTag = tag;
   if (type === 'tv') {
-     if (tag === '泰国') finalTag = '泰剧';
-     else if (tag === '美国') finalTag = '美剧';
-     else if (tag === '日本') finalTag = '日剧';
+    if (tag === '泰国') finalTag = '泰剧';
+    else if (tag === '美国') finalTag = '美剧';
+    else if (tag === '日本') finalTag = '日剧';
   }
-  
+
   // 必须使用 encodeURIComponent 确保中文标签被正确识别
-  const target = `https://movie.douban.com/j/search_subjects?type=${type}&tag=${encodeURIComponent(finalTag)}&sort=recommend&page_limit=${pageSize}&page_start=${pageStart}`;
+  const target = `https://movie.douban.com/j/search_subjects?type=${type}&tag=${encodeURIComponent(
+    finalTag
+  )}&sort=recommend&page_limit=${pageSize}&page_start=${pageStart}`;
   // -----------------------
 
   try {
     const doubanData = await fetchDoubanData(target);
-    const list: DoubanItem[] = doubanData.subjects.map((item) => ({
-      id: item.id,
-      title: item.title,
-      poster: item.cover,
-      rate: item.rate,
-      year: '',
-    }));
+    const list: DoubanItem[] = doubanData.subjects
+      .filter((item) => !isBlockedContent(item.title, item.card_subtitle))
+      .map((item) => ({
+        id: item.id,
+        title: item.title,
+        poster: item.cover,
+        rate: item.rate,
+        year: '',
+      }));
 
     const response: DoubanResult = {
       code: 200,
@@ -102,13 +109,24 @@ function handleTop250(pageStart: number) {
     .then(async (res) => {
       clearTimeout(timeoutId);
       const html = await res.text();
-      const moviePattern = /<div class="item">[\s\S]*?<a[^>]+href="https?:\/\/movie\.douban\.com\/subject\/(\d+)\/"[\s\S]*?<img[^>]+alt="([^"]+)"[^>]*src="([^"]+)"[\s\S]*?<span class="rating_num"[^>]*>([^<]*)<\/span>[\s\S]*?<\/div>/g;
+      const moviePattern =
+        /<div class="item">[\s\S]*?<a[^>]+href="https?:\/\/movie\.douban\.com\/subject\/(\d+)\/"[\s\S]*?<img[^>]+alt="([^"]+)"[^>]*src="([^"]+)"[\s\S]*?<span class="rating_num"[^>]*>([^<]*)<\/span>[\s\S]*?<\/div>/g;
       const movies: DoubanItem[] = [];
       let match;
       while ((match = moviePattern.exec(html)) !== null) {
-        movies.push({ id: match[1], title: match[2], poster: match[3].replace(/^http:/, 'https:'), rate: match[4], year: '' });
+        movies.push({
+          id: match[1],
+          title: match[2],
+          poster: match[3].replace(/^http:/, 'https:'),
+          rate: match[4],
+          year: '',
+        });
       }
-      return NextResponse.json({ code: 200, message: '获取成功', list: movies });
+      return NextResponse.json({
+        code: 200,
+        message: '获取成功',
+        list: movies,
+      });
     })
     .catch(() => NextResponse.json({ error: 'Failed' }, { status: 500 }));
 }

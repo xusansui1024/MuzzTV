@@ -30,6 +30,14 @@ const BLOCKED_KEYWORDS = [
   '换妻',
   '18禁',
   '十八禁',
+  '精液',
+  '抽插',
+  '情趣内衣',
+  '情趣用品',
+  '无套',
+  '内射',
+  '口爆',
+  '颜射',
   // 英文 / 拼音
   'porn',
   'hentai',
@@ -42,6 +50,26 @@ const BLOCKED_KEYWORDS = [
 ];
 
 /**
+ * 用户反馈仍会漏出来的成人向"场景词"。
+ * 这些词正常影视里也可能出现（《护士日记》《洗澡》《沐浴之王》），
+ * 所以标题里单独命中就拦，但整名在白名单里的放行；
+ * 简介里则要同时命中两个才拦，避免正常剧情简介被误杀。
+ */
+const SOFT_WORDS = ['护士', '偷拍', '偷窥', '黑丝', '丝袜', '洗澡', '沐浴'];
+
+/**
+ * 白名单：这些正常影视作品的名字里恰好带上面某些词，放行，避免误杀。
+ * 只列确定没问题的整名，不做模糊匹配。
+ */
+const TITLE_WHITELIST = [
+  '护士日记',
+  '洗澡',
+  '沐浴之王',
+  '洗澡堂老板家的男人们',
+  '护士当家',
+];
+
+/**
  * 需要区分上下文的词：
  * 「色情 / 情色」本身要拦，但《白色情人节》《血色情欲》《桃色情人》这类
  * 正常片名里也带这两个字，所以只在前一个字不是颜色/氛围字时才拦。
@@ -51,6 +79,22 @@ const CONTEXT_PATTERNS = [
   /(?:^|[^白黑蓝血桃粉紫绿黄红灰])情色/,
 ];
 
+/** 关键词命中判断：中文按去分隔符后的整体匹配，英文短词要求整词匹配 */
+function hitsKeywords(
+  texts: Array<string | undefined | null>,
+  blob: string,
+  list: string[]
+) {
+  const raw = texts.filter(Boolean).join(' ').toLowerCase();
+  return list.some((kw) => {
+    const key = kw.toLowerCase().replace(/[\s._\-·:：]/g, '');
+    if (/^[a-z]+$/.test(key) && key.length <= 4) {
+      return new RegExp(`(^|[^a-z])${key}([^a-z]|$)`).test(raw);
+    }
+    return blob.includes(key);
+  });
+}
+
 /** 标题里明显属于成人内容的判断（大小写、空格、标点都不影响） */
 export function isBlockedContent(...texts: Array<string | undefined | null>) {
   const blob = texts
@@ -59,17 +103,13 @@ export function isBlockedContent(...texts: Array<string | undefined | null>) {
     .toLowerCase()
     .replace(/[\s._\-·:：!！?？,，、|/\\()（）[\]【】'"“”]/g, '');
   if (!blob) return false;
+  if (TITLE_WHITELIST.some((t) => blob === t.toLowerCase())) return false;
   if (CONTEXT_PATTERNS.some((re) => re.test(blob))) return true;
-  return BLOCKED_KEYWORDS.some((kw) => {
-    const key = kw.toLowerCase().replace(/[\s._\-·:：]/g, '');
-    // 英文短词必须整词命中，避免 "jav" 命中 "java"、"xxx" 命中正常编号
-    if (/^[a-z]+$/.test(key) && key.length <= 4) {
-      return new RegExp(`(^|[^a-z])${key}([^a-z]|$)`).test(
-        texts.filter(Boolean).join(' ').toLowerCase()
-      );
-    }
-    return blob.includes(key);
-  });
+  if (hitsKeywords(texts, blob, BLOCKED_KEYWORDS)) return true;
+  // 标题里命中任意一个"场景词"（护士 / 洗澡 / 丝袜 / 偷拍…）都按成人内容处理；
+  // 正常的《护士日记》《洗澡》《沐浴之王》已由白名单放行
+  if (SOFT_WORDS.some((w) => blob.includes(w))) return true;
+  return false;
 }
 
 /**
@@ -84,6 +124,9 @@ const SUSPICIOUS_WORDS = [
   '更衣室',
   '洗澡',
   '沐浴',
+  '护士',
+  '丝袜',
+  '黑丝',
   '公寓',
   '厕所',
   '床上',
@@ -117,12 +160,16 @@ const DESC_ONLY_WORDS = [
 export function isBlockedDescription(
   ...texts: Array<string | undefined | null>
 ) {
-  const joined = texts.filter(Boolean).join(' ');
-  if (!joined) return false;
-  // 明确成人词：简介里出现一个就够
-  if (isBlockedContent(joined)) return true;
-  if (DESC_ONLY_WORDS.some((w) => joined.includes(w))) return true;
+  const blob = texts
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+    .replace(/[\s._\-·:：!！?？,，、|/\\()（）[\]【】'"“”]/g, '');
+  if (!blob) return false;
+  // 简介只拦"明确成人词"和简介专用词，不因为单个「护士 / 洗澡」就误杀正常剧情简介
+  if (hitsKeywords(texts, blob, BLOCKED_KEYWORDS)) return true;
+  if (DESC_ONLY_WORDS.some((w) => blob.includes(w))) return true;
   // 场景词需要同时命中两个，降低对正常剧情简介的误杀
-  const hits = SUSPICIOUS_WORDS.filter((w) => joined.includes(w)).length;
+  const hits = SUSPICIOUS_WORDS.filter((w) => blob.includes(w)).length;
   return hits >= 2;
 }

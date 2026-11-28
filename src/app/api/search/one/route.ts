@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { getAvailableApiSites, getCacheTime } from '@/lib/config';
+import { isBlockedContent, isBlockedDescription } from '@/lib/contentFilter';
 import { searchFromApi } from '@/lib/downstream';
 
 export const runtime = 'edge';
@@ -40,7 +41,11 @@ export async function GET(request: Request) {
       );
     }
 
-    const results = await searchFromApi(targetSite, query);
+    const results = (await searchFromApi(targetSite, query)).filter(
+      (r) =>
+        !isBlockedContent(r?.title, r?.class) &&
+        !isBlockedDescription(r?.desc, r?.class)
+    );
     const result = results.filter((r) => r.title === query);
     const cacheTime = await getCacheTime();
 
