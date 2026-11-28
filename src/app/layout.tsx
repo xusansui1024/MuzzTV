@@ -11,6 +11,7 @@ import RuntimeConfig from '@/lib/runtime';
 
 import { SiteProvider } from '@/components/SiteProvider';
 import { ThemeProvider } from '@/components/ThemeProvider';
+import TvBackGuard from '@/components/TvBackGuard';
 import TvExitDialog from '@/components/TvExitDialog';
 import TvNavigation from '@/components/TvNavigation';
 
@@ -127,6 +128,7 @@ export default async function RootLayout({
             {children}
           </SiteProvider>
           <TvNavigation />
+          <TvBackGuard />
           <TvExitDialog />
         </ThemeProvider>
       </body>

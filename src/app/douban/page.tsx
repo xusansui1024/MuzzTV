@@ -299,7 +299,7 @@ function DoubanPageClient() {
                 : '综艺')}
           </h1>
           {!custom && (
-            <div className='bg-white/60 rounded-2xl p-4 border border-gray-200/30 backdrop-blur-sm'>
+            <div className='bg-white/85 dark:bg-gray-900/85 rounded-2xl p-4 border border-gray-200/30 dark:border-gray-700/60 backdrop-blur-sm'>
               <DoubanSelector
                 type={type as 'movie' | 'tv' | 'show'}
                 primarySelection={primarySelection}

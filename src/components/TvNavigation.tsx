@@ -103,16 +103,7 @@ export default function TvNavigation() {
       return false;
     };
 
-    // 首层浏览页（没有"再上一层"的页面）：主页、分类页、搜索页
-    const isTopLevelPage = () => {
-      const p = window.location.pathname;
-      return (
-        p === '/' ||
-        p === '/douban' ||
-        p.startsWith('/douban/') ||
-        p === '/search'
-      );
-    };
+    // 首层浏览页的判定已随返回键统一迁移到 TvBackGuard
 
     const focusEl = (el: HTMLElement) => {
       if (currentRef.current && currentRef.current !== el) {
@@ -323,6 +314,61 @@ export default function TvNavigation() {
       return true;
     };
 
+    // 找出真正承担整页滚动的容器：从当前元素一路向上找，取滚动范围最大的那个
+    // （横向滑动行也可能 overflow-x:auto，不能误当成整页滚动容器；本站整页滚动在 body 上）
+    const scrollBox = (): HTMLElement => {
+      let best: HTMLElement = document.body;
+      let bestRange = document.body.scrollHeight - document.body.clientHeight;
+      let el: HTMLElement | null = currentRef.current?.parentElement ?? null;
+      while (el && el !== document.documentElement) {
+        const cs = window.getComputedStyle(el);
+        const range = el.scrollHeight - el.clientHeight;
+        if (
+          (cs.overflowY === 'auto' || cs.overflowY === 'scroll') &&
+          range > bestRange + 40
+        ) {
+          best = el;
+          bestRange = range;
+        }
+        el = el.parentElement;
+      }
+      return best;
+    };
+
+    // 整页翻页：滚一屏，再把焦点落到新一屏最上面那排的左侧第一张封面。
+    // 已经滚到页面顶/底部时什么都不做，避免"看起来卡住还乱跳"。
+    const flipPage = (dir: 'up' | 'down') => {
+      const box = scrollBox();
+      const before = box.scrollTop;
+      const step = Math.round((box.clientHeight || window.innerHeight) * 0.82);
+      const maxTop = Math.max(0, box.scrollHeight - box.clientHeight);
+      const target =
+        dir === 'up'
+          ? Math.max(0, before - step)
+          : Math.min(maxTop, before + step);
+      if (Math.abs(target - before) < 8) return;
+      box.scrollTo({ top: target, behavior: 'smooth' });
+      window.setTimeout(() => {
+        if (Math.abs(box.scrollTop - before) < 10) return;
+        const bounds = box.getBoundingClientRect();
+        const cards = collect().filter((el) => {
+          if (!isCard(el)) return false;
+          const r = el.getBoundingClientRect();
+          return r.bottom > bounds.top + 10 && r.top < bounds.bottom - 10;
+        });
+        if (!cards.length) return;
+        const tops = cards.map((el) => el.getBoundingClientRect().top);
+        const top = Math.min(...tops);
+        const row = cards
+          .filter((el) => el.getBoundingClientRect().top <= top + 16)
+          .sort(
+            (a, b) =>
+              a.getBoundingClientRect().left - b.getBoundingClientRect().left
+          );
+        if (row.length) focusEl(row[0]);
+      }, 420);
+    };
+
     const move = (dir: Dir) => {
       const current = currentRef.current;
       const els = collect();
@@ -412,13 +458,22 @@ export default function TvNavigation() {
 
       // 封面网格的边界约束：
       // - 任一排最左边那张封面按左，不再"飞"到侧边栏底部的「综艺」，改为回到侧边栏第一项；
-      // - 最上一排按上，不再跳到顶部的主题/账号等工具按钮，原地不动。
-      if (isCard(current) && (dir === 'left' || dir === 'up')) {
+      // - 最上一排按上 / 最下一排按下，不再跳到顶部的主题、账号按钮，改为整页翻页：
+      //   页面向上/向下滚一屏，焦点落到新一屏最上面那排的左侧第一张封面，可以一路翻到页面顶或继续往下翻。
+      if (
+        isCard(current) &&
+        (dir === 'left' || dir === 'up' || dir === 'down')
+      ) {
         const gridCands = cands.filter(({ el }) => isCard(el));
         const rowOverlap = (r: DOMRect) =>
           Math.max(
             0,
             Math.min(curRect.bottom, r.bottom) - Math.max(curRect.top, r.top)
+          );
+        const colOverlap = (r: DOMRect) =>
+          Math.max(
+            0,
+            Math.min(curRect.right, r.right) - Math.max(curRect.left, r.left)
           );
         if (dir === 'left') {
           const sameRow = gridCands.filter(({ r }) => rowOverlap(r) > 0);
@@ -429,20 +484,28 @@ export default function TvNavigation() {
           }
           cands.length = 0;
           cands.push(...sameRow);
-        } else {
-          // 向上：只认"同一列"里位置更高的封面，顶部那一排按上就是原地不动，
-          // 不要横向跳到同一行的别的卡片，也别跳到顶部的工具按钮
-          const colOverlap = (r: DOMRect) =>
-            Math.max(
-              0,
-              Math.min(curRect.right, r.right) - Math.max(curRect.left, r.left)
-            );
+        } else if (dir === 'up') {
+          // 只认"同一列"里位置更高的封面；到顶了就翻页向上，别去碰顶部工具按钮
           const above = gridCands.filter(
             ({ r }) => colOverlap(r) > 0 && r.top < curRect.top - 8
           );
-          if (!above.length) return;
+          if (!above.length) {
+            flipPage('up');
+            return;
+          }
           cands.length = 0;
           cands.push(...above);
+        } else {
+          // 向下：只认真的在下面一行（至少错开半张卡片高度，避免同一行里 1px 的错位被当成下一排）；
+          // 已经到了最底一排就翻页往下
+          const rowGap = Math.max(30, curRect.height * 0.5);
+          const below = gridCands.filter(
+            ({ r }) => r.top > curRect.top + rowGap
+          );
+          if (!below.length) {
+            flipPage('down');
+            return;
+          }
         }
       }
       if (!cands.length) return;
@@ -547,40 +610,8 @@ export default function TvNavigation() {
         tag === 'SELECT' ||
         !!target?.isContentEditable;
 
-      // 遥控器「返回」键：Android TV keyCode 4 / webOS 461 / Tizen 10009，
-      // 键名也可能是 Backspace、Escape、BrowserBack、GoBack 等
-      const backKeys = [
-        'Backspace',
-        'Escape',
-        'BrowserBack',
-        'GoBack',
-        'XF86Back',
-      ];
-      const isBackKey =
-        backKeys.includes(e.key) ||
-        e.keyCode === 4 ||
-        e.keyCode === 461 ||
-        e.keyCode === 10009;
-      if (isBackKey && !isTyping && !e.ctrlKey && !e.metaKey) {
-        e.preventDefault();
-        e.stopPropagation();
-        // 退出确认框开着时，返回键等于「取消」
-        if (document.querySelector('.tv-exit-dialog')) {
-          window.dispatchEvent(new CustomEvent('tv-exit-close'));
-        } else if (document.querySelector('.tv-panel.tv-open')) {
-          // 选集/换源抽屉开着时，返回键只收起抽屉，不能直接退出观影页
-          window.dispatchEvent(new CustomEvent('tv-close-panel'));
-        } else if (isTopLevelPage()) {
-          // 首层页面（主页 / 电影 / 剧集 / 综艺 / 搜索）按返回 = 问一句"退出还是取消"，
-          // 不再一级级回退历史
-          window.dispatchEvent(new CustomEvent('tv-exit-request'));
-        } else if (window.history.length > 1) {
-          window.history.back();
-        } else {
-          window.location.href = '/';
-        }
-        return;
-      }
+      // 返回键统一交给 TvBackGuard 处理（独立于焦点系统，keydown/keyup/popstate 三重兜底），
+      // 这里只处理方向键和确认键，避免重复弹窗或重复后退。
 
       switch (e.key) {
         case 'ArrowLeft':
@@ -648,6 +679,8 @@ export default function TvNavigation() {
     // 进入页面/路由变化后聚焦第一个元素
     const timer = window.setTimeout(focusFirst, 500);
     const onRouteChange = () => {
+      // 退出确认框开着时不要抢焦点（返回键兜底也会触发 popstate）
+      if (document.querySelector('.tv-exit-dialog')) return;
       window.setTimeout(focusFirst, 300);
       window.clearTimeout(timer);
     };

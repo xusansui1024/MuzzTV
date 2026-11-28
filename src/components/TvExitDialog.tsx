@@ -10,9 +10,14 @@ import { useEffect, useRef, useState } from 'react';
 export default function TvExitDialog() {
   const [open, setOpen] = useState(false);
   const cancelRef = useRef<HTMLButtonElement | null>(null);
+  // 记住弹出前的焦点，取消后原路还回去，避免焦点掉到 body、遥控器像失灵
+  const prevFocusRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
-    const onRequest = () => setOpen(true);
+    const onRequest = () => {
+      prevFocusRef.current = document.activeElement as HTMLElement | null;
+      setOpen(true);
+    };
     const onClose = () => setOpen(false);
     window.addEventListener('tv-exit-request', onRequest);
     window.addEventListener('tv-exit-close', onClose);
@@ -56,10 +61,23 @@ export default function TvExitDialog() {
 
   const close = () => {
     setOpen(false);
-    // 关闭后把焦点还给刚才的位置
-    window.dispatchEvent(
-      new CustomEvent('tv-focus-first', { detail: 'a[href]' })
-    );
+    // 关闭后把焦点还给刚才的位置：优先原来那个元素，其次退回上一个电视焦点，
+    // 最后才找第一个可聚焦元素。分两次尝试，兼容 React 卸载慢一拍的情况。
+    const restore = () => {
+      const prev = prevFocusRef.current;
+      if (prev && document.body.contains(prev)) {
+        prev.focus();
+        return true;
+      }
+      window.dispatchEvent(
+        new CustomEvent('tv-focus-first', { detail: '[data-tv-focusable]' })
+      );
+      return false;
+    };
+    window.setTimeout(() => {
+      if (restore()) return;
+      window.setTimeout(restore, 250);
+    }, 60);
   };
 
   const exitApp = () => {
