@@ -2,7 +2,7 @@
 
 import { Download, Monitor, Smartphone, Tv, X } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { DOWNLOAD_PAGE_PATH, DOWNLOADS } from '@/lib/downloads';
@@ -35,8 +35,28 @@ const DownloadEntry = ({
   // 导致底部抽屉被裁成顶栏高度。用 Portal 把抽屉挂到 body 上，脱离该影响。
   const [mounted, setMounted] = useState(false);
 
+  // 鼠标离开后延迟收起悬停卡片，留出移动到卡片里点下载的时间
+  const closeTimer = useRef<number | null>(null);
+  const hoverIn = () => {
+    if (closeTimer.current !== null) {
+      window.clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+    setHovered(true);
+  };
+  const hoverOut = () => {
+    if (closeTimer.current !== null) window.clearTimeout(closeTimer.current);
+    closeTimer.current = window.setTimeout(() => {
+      closeTimer.current = null;
+      setHovered(false);
+    }, 1200);
+  };
+
   useEffect(() => {
     setMounted(true);
+    return () => {
+      if (closeTimer.current !== null) window.clearTimeout(closeTimer.current);
+    };
   }, []);
 
   useEffect(() => {
@@ -56,9 +76,9 @@ const DownloadEntry = ({
     };
   }, [open]);
 
-  /** 悬停卡片内容（桌面右上角与侧边栏底部共用） */
+  /** 悬停卡片内容（桌面右上角与侧边栏底部共用，宽度由外层控制） */
   const hoverCard = (
-    <div className='w-[300px] rounded-2xl p-4 border border-white/60 dark:border-white/10 bg-white/70 dark:bg-gray-900/75 backdrop-blur-2xl shadow-[0_16px_48px_-16px_rgba(0,0,0,0.3)]'>
+    <div className='w-full rounded-2xl p-4 border border-white/60 dark:border-white/10 bg-white/70 dark:bg-gray-900/75 backdrop-blur-2xl shadow-[0_16px_48px_-16px_rgba(0,0,0,0.3)]'>
       <div className='flex items-center gap-2.5'>
         <div className='shrink-0 w-9 h-9 rounded-lg overflow-hidden ring-1 ring-black/5 dark:ring-white/10'>
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -109,8 +129,8 @@ const DownloadEntry = ({
       <div
         className='relative'
         data-tv-hide='1'
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
+        onMouseEnter={hoverIn}
+        onMouseLeave={hoverOut}
       >
         <Link
           href={DOWNLOAD_PAGE_PATH}
@@ -128,7 +148,7 @@ const DownloadEntry = ({
               : 'pointer-events-none opacity-0 -translate-y-1'
           }`}
         >
-          <div className='relative'>
+          <div className='relative w-[300px]'>
             {/* 指向按钮的小三角 */}
             <div className='absolute -top-[5px] right-[46px] w-2.5 h-2.5 rotate-45 bg-white/70 dark:bg-gray-900/80 backdrop-blur-2xl border-l border-t border-white/60 dark:border-white/10' />
             {hoverCard}
@@ -234,22 +254,23 @@ const DownloadEntry = ({
       <div
         className='relative'
         data-tv-hide='1'
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
+        onMouseEnter={hoverIn}
+        onMouseLeave={hoverOut}
       >
-        {/* 悬停卡片：出现在按钮正上方，淡入 + 轻微上移，鼠标移开淡出 */}
+        {/* 悬停卡片：出现在按钮正上方，淡入 + 轻微上移，鼠标移开延迟淡出 */}
         <div
-          className={`absolute bottom-full left-0 z-40 mb-2 origin-bottom-left transition-all duration-200 ease-out ${
+          className={`absolute bottom-full z-40 mb-2 origin-bottom-left transition-all duration-200 ease-out ${
             hovered
               ? 'opacity-100 translate-y-0 scale-100'
               : 'pointer-events-none opacity-0 translate-y-2 scale-[0.98]'
-          } ${compact ? 'left-1' : ''}`}
+          } ${
+            compact ? 'left-0 w-[200px]' : 'left-1/2 w-[240px] -translate-x-1/2'
+          }`}
         >
           {hoverCard}
         </div>
 
         <button
-          onClick={() => setOpen(true)}
           title='下载客户端'
           aria-label='下载客户端'
           className={`group inline-flex items-center justify-center gap-2 rounded-lg border border-green-500/70 bg-green-50/40 px-4 py-2 text-sm text-green-600 transition-colors duration-200 min-h-[40px] hover:border-green-600 hover:bg-green-500/10 hover:text-green-700 dark:border-green-400/50 dark:bg-green-400/10 dark:text-green-400 dark:hover:border-green-400 dark:hover:bg-green-400/15 dark:hover:text-green-300 ${
@@ -261,7 +282,6 @@ const DownloadEntry = ({
           </div>
           {!compact && <span className='whitespace-nowrap'>下载客户端</span>}
         </button>
-        {sheet}
       </div>
     );
   }
