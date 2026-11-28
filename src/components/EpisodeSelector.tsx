@@ -472,39 +472,44 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
       {/* 选集 Tab 内容 */}
       {activeTab === 'episodes' && (
         <>
-          {/* 分类标签 */}
+          {/* 分类标签：只有一页时不显示「1-12」这种没有实际用途的页码文字 */}
           <div className='flex items-center gap-4 mb-4 border-b border-gray-300 dark:border-gray-700 -mx-6 px-6 flex-shrink-0'>
-            <div className='flex-1 overflow-x-auto' ref={categoryContainerRef}>
-              <div className='flex gap-2 min-w-max'>
-                {categories.map((label, idx) => {
-                  const isActive = idx === displayPage;
-                  return (
-                    <button
-                      key={label}
-                      ref={(el) => {
-                        buttonRefs.current[idx] = el;
-                      }}
-                      onClick={() => handleCategoryClick(idx)}
-                      className={`w-20 relative py-2 text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0 text-center 
-                        ${
-                          isActive
-                            ? 'text-green-500 dark:text-green-400'
-                            : 'text-gray-700 hover:text-green-600 dark:text-gray-300 dark:hover:text-green-400'
-                        }
-                      `.trim()}
-                    >
-                      {label}
-                      {isActive && (
-                        <div className='absolute bottom-0 left-0 right-0 h-0.5 bg-green-500 dark:bg-green-400' />
-                      )}
-                    </button>
-                  );
-                })}
+            {categories.length > 1 && (
+              <div
+                className='flex-1 overflow-x-auto'
+                ref={categoryContainerRef}
+              >
+                <div className='flex gap-2 min-w-max'>
+                  {categories.map((label, idx) => {
+                    const isActive = idx === displayPage;
+                    return (
+                      <button
+                        key={label}
+                        ref={(el) => {
+                          buttonRefs.current[idx] = el;
+                        }}
+                        onClick={() => handleCategoryClick(idx)}
+                        className={`w-20 relative py-2 text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0 text-center 
+                          ${
+                            isActive
+                              ? 'text-green-500 dark:text-green-400'
+                              : 'text-gray-700 hover:text-green-600 dark:text-gray-300 dark:hover:text-green-400'
+                          }
+                        `.trim()}
+                      >
+                        {label}
+                        {isActive && (
+                          <div className='absolute bottom-0 left-0 right-0 h-0.5 bg-green-500 dark:bg-green-400' />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
+            )}
             {/* 向上/向下按钮 */}
             <button
-              className='flex-shrink-0 w-8 h-8 rounded-md flex items-center justify-center text-gray-700 hover:text-green-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-green-400 dark:hover:bg-white/20 transition-colors transform translate-y-[-4px]'
+              className='flex-shrink-0 w-8 h-8 rounded-md flex items-center justify-center text-gray-700 hover:text-green-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-green-400 dark:hover:bg-white/20 transition-colors transform translate-y-[-4px] ml-auto'
               onClick={() => {
                 // 切换集数排序（正序/倒序）
                 setDescending((prev) => !prev);

@@ -11,6 +11,7 @@ import RuntimeConfig from '@/lib/runtime';
 
 import { SiteProvider } from '@/components/SiteProvider';
 import { ThemeProvider } from '@/components/ThemeProvider';
+import TvExitDialog from '@/components/TvExitDialog';
 import TvNavigation from '@/components/TvNavigation';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -126,6 +127,7 @@ export default async function RootLayout({
             {children}
           </SiteProvider>
           <TvNavigation />
+          <TvExitDialog />
         </ThemeProvider>
       </body>
     </html>

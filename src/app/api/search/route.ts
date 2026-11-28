@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { getAvailableApiSites, getCacheTime } from '@/lib/config';
+import { isBlockedContent } from '@/lib/contentFilter';
 import { searchFromApi } from '@/lib/downstream';
 import { SearchResult } from '@/lib/types';
 
@@ -50,7 +51,10 @@ export async function GET(request: Request) {
     timeoutPromise,
   ]);
 
-  const flattenedResults = results.flat();
+  // 上游资源站的成人条目按标题兜底过滤，不让它出现在搜索结果里
+  const flattenedResults = results
+    .flat()
+    .filter((item) => !isBlockedContent(item?.title));
   const cacheTime = await getCacheTime();
   // 空结果只短缓存（1 分钟）：源接口偶发集体超时会返回空结果，
   // 若按正常时长缓存会使用户数小时内反复搜到空结果

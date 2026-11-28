@@ -77,8 +77,11 @@ export default function TvNavigation() {
       const els = Array.from(
         document.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)
       );
+      // 装饰性 / 没有实际操作意义的文字（站名 logo、页内的纯说明标签）标了
+      // data-tv-skip，遥控器直接跳过，不浪费一次按键
+      const usable = els.filter((el) => !el.closest('[data-tv-skip]'));
       const roots = overlayRoots();
-      const visible = els.filter(isVisible);
+      const visible = usable.filter(isVisible);
       // 选集抽屉打开时，焦点只在抽屉（和底部遥控条）里走，
       // 否则满屏的播放舞台会把方向键"吸"过去
       const openPanel = document.querySelector('.tv-panel.tv-open');
@@ -121,7 +124,13 @@ export default function TvNavigation() {
       const els = collect();
       if (!els.length) return;
       const preferred = els.find((el) => el.hasAttribute('data-tv-autofocus'));
-      focusEl(preferred || els[0]);
+      if (preferred) {
+        focusEl(preferred);
+        return;
+      }
+      // 一般页面：优先落在侧边栏第一个菜单项（首页），不要让顶部的装饰按钮抢焦点
+      const menuFirst = els.find((el) => isSidebarEl(el));
+      focusEl(menuFirst || els[0]);
     };
 
     // 菜单项上按右键：跳到主内容区第一张封面卡片（优先卡片，不再落到顶部的切换按钮上）
@@ -151,7 +160,23 @@ export default function TvNavigation() {
       };
 
       const cards = els.filter((el) => isCard(el) && inMain(el));
-      if (cards.length) return pick(cards);
+      if (cards.length) {
+        // 从菜单进入内容区，永远先落到"离菜单最近那一行里最靠左"的封面，
+        // 也就是这一屏的第一个影片，不要因为纵向距离打分的细微差别跳到第二张
+        const rows = cards.map((el) => {
+          const r = el.getBoundingClientRect();
+          return { el, top: r.top, left: r.left };
+        });
+        const minDy = Math.min(...rows.map((x) => Math.abs(x.top - curCY)));
+        const nearRow = rows.filter(
+          (x) => Math.abs(x.top - curCY) <= minDy + 40
+        );
+        nearRow.sort((a, b) => a.left - b.left);
+        if (nearRow[0]) {
+          focusEl(nearRow[0].el);
+          return true;
+        }
+      }
       const others = els.filter(
         (el) => inMain(el) && el.getBoundingClientRect().width > 30
       );
@@ -481,9 +506,15 @@ export default function TvNavigation() {
       if (isBackKey && !isTyping && !e.ctrlKey && !e.metaKey) {
         e.preventDefault();
         e.stopPropagation();
-        // 选集/换源抽屉开着时，返回键只收起抽屉，不能直接退出观影页
-        if (document.querySelector('.tv-panel.tv-open')) {
+        // 退出确认框开着时，返回键等于「取消」
+        if (document.querySelector('.tv-exit-dialog')) {
+          window.dispatchEvent(new CustomEvent('tv-exit-close'));
+        } else if (document.querySelector('.tv-panel.tv-open')) {
+          // 选集/换源抽屉开着时，返回键只收起抽屉，不能直接退出观影页
           window.dispatchEvent(new CustomEvent('tv-close-panel'));
+        } else if (window.location.pathname === '/') {
+          // 主页按返回 = 问一句"退出还是取消"，不再一级级回退历史
+          window.dispatchEvent(new CustomEvent('tv-exit-request'));
         } else if (window.history.length > 1) {
           window.history.back();
         } else {
@@ -567,6 +598,8 @@ export default function TvNavigation() {
     const keepFocusClass = (): boolean => {
       const cur = currentRef.current;
       if (!cur || !document.body.contains(cur)) return false;
+      // 弹窗/抽屉打开后，被盖住的元素即使还在 DOM 里也不该继续高亮
+      if (!collect().includes(cur)) return false;
       if (!cur.classList.contains('tv-focused'))
         cur.classList.add('tv-focused');
       return true;
