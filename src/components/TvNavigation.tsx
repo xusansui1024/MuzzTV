@@ -66,11 +66,21 @@ export default function TvNavigation() {
       return true;
     };
 
+    // 电视端播放页有"全屏舞台 + 底部遥控条 + 选集抽屉"这层覆盖结构，
+    // 页面底下的元素虽然还在 DOM 里（也在视口内），但被盖住了，不能再抢焦点。
+    const overlayRoots = (): Element[] =>
+      Array.from(document.querySelectorAll('.tv-overlay'));
+
     const collect = (): HTMLElement[] => {
       const els = Array.from(
         document.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)
       );
-      return els.filter(isVisible);
+      const roots = overlayRoots();
+      const visible = els.filter(isVisible);
+      if (!roots.length) return visible;
+      return visible.filter((el) =>
+        roots.some((root) => root.contains(el) || root === el)
+      );
     };
 
     // 侧边栏判定：只看真实的侧边栏容器（aside），不再用"靠左 22%"这种几何猜测，
@@ -99,7 +109,9 @@ export default function TvNavigation() {
 
     const focusFirst = () => {
       const els = collect();
-      if (els.length) focusEl(els[0]);
+      if (!els.length) return;
+      const preferred = els.find((el) => el.hasAttribute('data-tv-autofocus'));
+      focusEl(preferred || els[0]);
     };
 
     // 菜单项上按右键：跳到主内容区第一张封面卡片（优先卡片，不再落到顶部的切换按钮上）
@@ -423,17 +435,70 @@ export default function TvNavigation() {
       window.clearTimeout(timer);
     };
 
+    // React 重渲染会把 className 整个覆盖掉，我们加的 tv-focused 可能被抹掉。
+    // 这里优先"补回同一个元素的焦点"，元素真被换掉时才重新挑一个。
+    const keepFocusClass = (): boolean => {
+      const cur = currentRef.current;
+      if (!cur || !document.body.contains(cur)) return false;
+      if (!cur.classList.contains('tv-focused'))
+        cur.classList.add('tv-focused');
+      return true;
+    };
+
+    const focusRecover = () => {
+      const panel = document.querySelector('.tv-panel.tv-open');
+      if (panel) {
+        const inside = collect().filter((el) => panel.contains(el));
+        if (inside.length) {
+          focusEl(inside[0]);
+          return;
+        }
+      }
+      focusFirst();
+    };
+
     // 播放器控制条会随播放器重建，需要持续补标记
     markPlayerControls();
     const markTimer = window.setInterval(markPlayerControls, 1200);
 
+    // 兜底：React 重渲染可能把带 tv-focused 的节点整个换掉，
+    // 焦点会"消失"，遥控器按了像没反应。这里定期检查，丢了就补回来。
+    const focusGuardTimer = window.setInterval(() => {
+      if (!keepFocusClass()) focusRecover();
+    }, 700);
+
+    // 播放页抽屉/遥控条切换时，由组件发起"把焦点送到某个区域"的请求
+    const onFocusRequest = (ev: Event) => {
+      const selector = (ev as CustomEvent).detail as string | undefined;
+      if (!selector) return;
+      try {
+        const els = collect().filter((el) => el.closest(selector));
+        if (els.length) focusEl(els[0]);
+      } catch {
+        // 选择器写错时忽略，不影响方向键主流程
+      }
+    };
+
     window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('tv-focus-first', onFocusRequest as EventListener);
     window.addEventListener('popstate', onRouteChange);
     // Next.js App Router 下监听文档可见性变化重新聚焦（页面切换后 DOM 替换）
     const observer = new MutationObserver(() => {
       markPlayerControls();
-      if (currentRef.current && !document.body.contains(currentRef.current)) {
-        focusFirst();
+      keepFocusClass();
+      const cur = currentRef.current;
+      if (cur && !document.body.contains(cur)) {
+        focusRecover();
+        return;
+      }
+      // 播放页全屏舞台出现后，焦点若还停在被盖住的页面元素上，重新落到遥控条
+      const roots = overlayRoots();
+      if (
+        cur &&
+        roots.length &&
+        !roots.some((root) => root.contains(cur) || root === cur)
+      ) {
+        focusRecover();
       }
     });
     observer.observe(document.body, { childList: true, subtree: true });
@@ -441,7 +506,12 @@ export default function TvNavigation() {
     return () => {
       window.clearTimeout(timer);
       window.clearInterval(markTimer);
+      window.clearInterval(focusGuardTimer);
       window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener(
+        'tv-focus-first',
+        onFocusRequest as EventListener
+      );
       window.removeEventListener('popstate', onRouteChange);
       observer.disconnect();
       currentRef.current?.classList.remove('tv-focused');

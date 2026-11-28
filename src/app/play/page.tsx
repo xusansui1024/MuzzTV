@@ -27,6 +27,7 @@ import { getVideoResolutionFromM3u8, processImageUrl } from '@/lib/utils';
 
 import EpisodeSelector from '@/components/EpisodeSelector';
 import PageLayout from '@/components/PageLayout';
+import TvPlayerBar from '@/components/TvPlayerBar';
 
 // 扩展 HTMLVideoElement 类型以支持 hls 属性
 declare global {
@@ -197,6 +198,10 @@ function PlayPageClient() {
   const [isEpisodeSelectorCollapsed, setIsEpisodeSelectorCollapsed] =
     useState(false);
 
+  // 电视端：默认全屏播放 + 底部遥控条 + 选集/换源抽屉
+  const [isTvMode, setIsTvMode] = useState(false);
+  const [tvPanelOpen, setTvPanelOpen] = useState(false);
+
   // 换源加载状态
   const [isVideoLoading, setIsVideoLoading] = useState(true);
   const [videoLoadingStage, setVideoLoadingStage] = useState<
@@ -214,6 +219,29 @@ function PlayPageClient() {
 
   const artPlayerRef = useRef<any>(null);
   const artRef = useRef<HTMLDivElement | null>(null);
+
+  // TvNavigation 会在挂载时给 <html>/<body> 加 tv-mode，这里跟着切换电视端布局
+  useEffect(() => {
+    const detect = () =>
+      document.documentElement.classList.contains('tv-mode') ||
+      document.body.classList.contains('tv-mode');
+    const sync = () => setIsTvMode(detect());
+    sync();
+    const timer = window.setTimeout(sync, 300);
+    const observer = new MutationObserver(sync);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class'],
+    });
+    observer.observe(document.body, {
+      attributes: true,
+      attributeFilter: ['class'],
+    });
+    return () => {
+      window.clearTimeout(timer);
+      observer.disconnect();
+    };
+  }, []);
 
   // -----------------------------------------------------------------------------
   // 工具函数（Utils）
@@ -781,12 +809,26 @@ function PlayPageClient() {
   }, []);
 
   // 处理换源
+  // 电视端：选完集数/源后自动收起抽屉，并把遥控焦点送回底部遥控条，
+  // 否则列表重新渲染会把焦点丢掉（focus 消失，方向键就像没反应）
+  const closeTvPanelAfterChoice = () => {
+    if (!isTvMode) return;
+    setTvPanelOpen(false);
+    window.setTimeout(() => {
+      window.dispatchEvent(
+        new CustomEvent('tv-focus-first', { detail: '.tv-player-bar' })
+      );
+    }, 260);
+  };
+
   const handleSourceChange = async (
     newSource: string,
     newId: string,
     newTitle: string
   ) => {
     try {
+      // 电视端选完源后收起抽屉，焦点回到遥控条
+      closeTvPanelAfterChoice();
       // 显示换源加载状态
       setVideoLoadingStage('sourceChanging');
       setIsVideoLoading(true);
@@ -933,6 +975,7 @@ function PlayPageClient() {
         saveCurrentPlayProgress();
       }
       setCurrentEpisodeIndex(episodeNumber);
+      closeTvPanelAfterChoice();
     }
   };
 
@@ -1801,6 +1844,23 @@ function PlayPageClient() {
 
   return (
     <PageLayout activePath='/play'>
+      {/* 电视端：默认全屏播放（舞台铺满屏幕），底部自带遥控条 */}
+      {isTvMode && (
+        <TvPlayerBar
+          panelOpen={tvPanelOpen}
+          onTogglePanel={() => {
+            const next = !tvPanelOpen;
+            setTvPanelOpen(next);
+            window.setTimeout(() => {
+              window.dispatchEvent(
+                new CustomEvent('tv-focus-first', {
+                  detail: next ? '.tv-panel' : '.tv-player-bar',
+                })
+              );
+            }, 280);
+          }}
+        />
+      )}
       <div className='flex flex-col gap-3 py-4 px-5 lg:px-[3rem] 2xl:px-20'>
         {/* 第一行：影片标题 */}
         <div className='py-1'>
@@ -1869,7 +1929,13 @@ function PlayPageClient() {
                 isEpisodeSelectorCollapsed ? 'col-span-1' : 'md:col-span-3'
               }`}
             >
-              <div className='relative w-full h-[300px] lg:h-full'>
+              <div
+                className={
+                  isTvMode
+                    ? 'relative w-full h-full tv-overlay tv-play-stage'
+                    : 'relative w-full h-[300px] lg:h-full'
+                }
+              >
                 <div
                   ref={artRef}
                   className='bg-black w-full h-full rounded-xl overflow-hidden shadow-lg'
@@ -1915,12 +1981,16 @@ function PlayPageClient() {
               </div>
             </div>
 
-            {/* 选集和换源 - 在移动端始终显示，在 lg 及以上可折叠 */}
+            {/* 选集和换源 - 在移动端始终显示，在 lg 及以上可折叠；电视端作为右侧抽屉 */}
             <div
               className={`h-[300px] lg:h-full md:overflow-hidden transition-all duration-300 ease-in-out ${
                 isEpisodeSelectorCollapsed
                   ? 'md:col-span-1 lg:hidden lg:opacity-0 lg:scale-95'
                   : 'md:col-span-1 lg:opacity-100 lg:scale-100'
+              } ${
+                isTvMode
+                  ? `tv-overlay tv-panel ${tvPanelOpen ? 'tv-open' : ''}`
+                  : ''
               }`}
             >
               <EpisodeSelector

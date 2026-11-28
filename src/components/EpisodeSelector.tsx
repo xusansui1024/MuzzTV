@@ -442,6 +442,7 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
         {totalEpisodes > 1 && (
           <div
             onClick={() => setActiveTab('episodes')}
+            data-tv-control='tab-episodes'
             className={`flex-1 py-3 px-6 text-center cursor-pointer transition-all duration-200 font-medium
               ${
                 activeTab === 'episodes'
@@ -455,6 +456,7 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
         )}
         <div
           onClick={handleSourceTabClick}
+          data-tv-control='tab-sources'
           className={`flex-1 py-3 px-6 text-center cursor-pointer transition-all duration-200 font-medium
             ${
               activeTab === 'sources'
@@ -603,6 +605,7 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
                       onClick={() =>
                         !isCurrentSource && handleSourceClick(source)
                       }
+                      data-tv-control='source-card'
                       className={`flex items-start gap-3 px-2 py-3 rounded-lg transition-all select-none duration-200 relative
                       ${
                         isCurrentSource

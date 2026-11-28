@@ -266,25 +266,141 @@ div[data-media-provider] video {
   grid-template-columns: auto 1fr !important;
 }
 
-/* 电视模式常显播放器控制条：遥控器没有鼠标移动，
-   播放器默认会把控制条淡出隐藏，导致遥控焦点无处可落（全屏/设置选不到） */
+/* 电视端播放页：隐藏 ArtPlayer 自带控制条（那条只有鼠标悬停才好用），
+   改用页面底部的遥控条 TvPlayerBar，按钮是原生 button，遥控器直接能选 */
 .tv-mode .art-video-player .art-bottom {
+  display: none !important;
+}
+
+/* 电视端播放页默认全屏：播放器舞台铺满整个视口，页面其他内容被盖住 */
+.tv-mode .tv-play-stage {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 900;
+  width: 100vw !important;
+  height: 100vh !important;
+  background: #000;
+  border-radius: 0 !important;
+}
+
+.tv-mode .tv-play-stage .art-video-player {
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 0 !important;
+}
+
+.tv-mode .tv-play-stage .art-video-player video {
+  object-fit: contain;
+}
+
+/* 选集 / 换源抽屉：从右侧滑出，盖在播放器之上，底部留出遥控条的位置 */
+.tv-mode .tv-panel {
+  position: fixed !important;
+  top: 0;
+  right: 0;
+  bottom: 112px;
+  height: auto !important;
+  width: 34vw;
+  min-width: 420px;
+  max-width: 620px;
+  z-index: 960;
+  display: block !important;
   opacity: 1 !important;
+  visibility: visible !important;
+  transform: translateX(105%);
+  transition: transform 0.22s ease;
+  background: #fff;
+  color: #111;
+  border-left: 1px solid rgba(0, 0, 0, 0.12);
+  box-shadow: -18px 0 48px rgba(0, 0, 0, 0.55);
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
-.tv-mode .art-video-player .art-bottom .art-controls,
-.tv-mode .art-video-player .art-bottom .art-progress {
-  transform: translateY(0) !important;
+.tv-mode .tv-panel.tv-open {
+  transform: translateX(0);
 }
 
-/* 播放器控件获得遥控焦点时的描边（与封面绿框区分，用蓝色细框） */
-.tv-mode .art-video-player [data-tv-control].tv-focused {
+/* 抽屉顶部留白，避免"选集/换源"标签贴到屏幕上边 */
+.tv-mode .tv-panel > div {
+  padding-top: 14px;
+}
+
+/* 底部遥控条 */
+.tv-mode .tv-player-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 980;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 26px 40px 18px;
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.92) 55%,
+    rgba(0, 0, 0, 0)
+  );
+}
+
+.tv-mode .tv-player-bar .tv-progress {
+  position: absolute;
+  left: 40px;
+  right: 40px;
+  top: 8px;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.22);
+  overflow: hidden;
+}
+
+.tv-mode .tv-player-bar .tv-progress-fill {
+  height: 100%;
+  background: #38bdf8;
+  transition: width 0.4s linear;
+}
+
+.tv-mode .tv-player-bar .tv-bar-time {
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tv-mode .tv-bar-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 58px;
+  padding: 0 18px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-size: 18px;
+  white-space: nowrap;
+  transition: background 0.15s ease, outline-color 0.15s ease;
+}
+
+.tv-mode .tv-bar-btn svg {
+  flex-shrink: 0;
+}
+
+.tv-mode .tv-bar-btn.tv-focused {
   outline: 3px solid #38bdf8 !important;
-  outline-offset: -3px;
-  border-radius: 0.5rem;
-  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.35) !important;
+  outline-offset: 0;
+  background: rgba(56, 189, 248, 0.4);
+  color: #fff;
+  box-shadow: 0 0 24px rgba(56, 189, 248, 0.55) !important;
   transform: none !important;
-  z-index: 50;
+}
+
+/* 抽屉里的按钮沿用蓝色描边，白底上也要看得清 */
+.tv-mode .tv-panel .tv-focused {
+  outline: 3px solid #0ea5e9 !important;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.25) !important;
+  transform: none !important;
 }
 
 /* 下载入口面板上滑动画 */
