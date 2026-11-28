@@ -56,6 +56,54 @@ const DownloadEntry = ({
     };
   }, [open]);
 
+  /** 悬停卡片内容（桌面右上角与侧边栏底部共用） */
+  const hoverCard = (
+    <div className='w-[300px] rounded-2xl p-4 border border-white/60 dark:border-white/10 bg-white/70 dark:bg-gray-900/75 backdrop-blur-2xl shadow-[0_16px_48px_-16px_rgba(0,0,0,0.3)]'>
+      <div className='flex items-center gap-2.5'>
+        <div className='shrink-0 w-9 h-9 rounded-lg overflow-hidden ring-1 ring-black/5 dark:ring-white/10'>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src='/logo.png'
+            alt='客户端图标'
+            className='w-full h-full object-cover'
+          />
+        </div>
+        <div className='min-w-0'>
+          <div className='text-sm font-medium text-gray-900 dark:text-gray-100'>
+            慕朝朝TV 客户端
+          </div>
+          <div className='text-[11px] text-gray-400'>
+            手机 · 平板 · 电视 · Windows
+          </div>
+        </div>
+      </div>
+
+      <div className='mt-3 space-y-0.5'>
+        {DOWNLOADS.map((item) => (
+          <a
+            key={item.id}
+            href={item.file}
+            download
+            className='flex items-center gap-2.5 -mx-2 px-2 py-2 rounded-lg transition-colors hover:bg-black/5 dark:hover:bg-white/5'
+          >
+            <span className='shrink-0 w-7 h-7 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 flex items-center justify-center'>
+              <PlatformIcon icon={item.icon} />
+            </span>
+            <span className='min-w-0 flex-1'>
+              <span className='block text-xs font-medium text-gray-900 dark:text-gray-100'>
+                {item.platform} 客户端
+              </span>
+              <span className='block text-[10px] text-gray-400'>
+                v{item.version} · {item.size}
+              </span>
+            </span>
+            <Download className='w-4 h-4 shrink-0 text-green-600 dark:text-green-400' />
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+
   if (variant === 'desktop') {
     return (
       <div
@@ -73,59 +121,19 @@ const DownloadEntry = ({
           <span>下载客户端</span>
         </Link>
 
-        {hovered && (
-          <div className='absolute right-0 top-full z-40 pt-2'>
-            <div className='relative'>
-              {/* 指向按钮的小三角 */}
-              <div className='absolute -top-[5px] right-[46px] w-2.5 h-2.5 rotate-45 bg-white/70 dark:bg-gray-900/80 backdrop-blur-2xl border-l border-t border-white/60 dark:border-white/10' />
-
-              <div className='w-[300px] rounded-2xl p-4 border border-white/60 dark:border-white/10 bg-white/70 dark:bg-gray-900/75 backdrop-blur-2xl shadow-[0_16px_48px_-16px_rgba(0,0,0,0.3)]'>
-                <div className='flex items-center gap-2.5'>
-                  <div className='shrink-0 w-9 h-9 rounded-lg overflow-hidden ring-1 ring-black/5 dark:ring-white/10'>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src='/logo.png'
-                      alt='客户端图标'
-                      className='w-full h-full object-cover'
-                    />
-                  </div>
-                  <div className='min-w-0'>
-                    <div className='text-sm font-medium text-gray-900 dark:text-gray-100'>
-                      慕朝朝TV 客户端
-                    </div>
-                    <div className='text-[11px] text-gray-400'>
-                      手机 · 平板 · 电视 · Windows
-                    </div>
-                  </div>
-                </div>
-
-                <div className='mt-3 space-y-0.5'>
-                  {DOWNLOADS.map((item) => (
-                    <a
-                      key={item.id}
-                      href={item.file}
-                      download
-                      className='flex items-center gap-2.5 -mx-2 px-2 py-2 rounded-lg transition-colors hover:bg-black/5 dark:hover:bg-white/5'
-                    >
-                      <span className='shrink-0 w-7 h-7 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 flex items-center justify-center'>
-                        <PlatformIcon icon={item.icon} />
-                      </span>
-                      <span className='min-w-0 flex-1'>
-                        <span className='block text-xs font-medium text-gray-900 dark:text-gray-100'>
-                          {item.platform} 客户端
-                        </span>
-                        <span className='block text-[10px] text-gray-400'>
-                          v{item.version} · {item.size}
-                        </span>
-                      </span>
-                      <Download className='w-4 h-4 shrink-0 text-green-600 dark:text-green-400' />
-                    </a>
-                  ))}
-                </div>
-              </div>
-            </div>
+        <div
+          className={`absolute right-0 top-full z-40 pt-2 transition-all duration-200 ease-out ${
+            hovered
+              ? 'opacity-100 translate-y-0'
+              : 'pointer-events-none opacity-0 -translate-y-1'
+          }`}
+        >
+          <div className='relative'>
+            {/* 指向按钮的小三角 */}
+            <div className='absolute -top-[5px] right-[46px] w-2.5 h-2.5 rotate-45 bg-white/70 dark:bg-gray-900/80 backdrop-blur-2xl border-l border-t border-white/60 dark:border-white/10' />
+            {hoverCard}
           </div>
-        )}
+        </div>
       </div>
     );
   }
@@ -223,10 +231,25 @@ const DownloadEntry = ({
 
   if (variant === 'sidebar') {
     return (
-      <>
+      <div
+        className='relative'
+        data-tv-hide='1'
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+      >
+        {/* 悬停卡片：出现在按钮正上方，淡入 + 轻微上移，鼠标移开淡出 */}
+        <div
+          className={`absolute bottom-full left-0 z-40 mb-2 origin-bottom-left transition-all duration-200 ease-out ${
+            hovered
+              ? 'opacity-100 translate-y-0 scale-100'
+              : 'pointer-events-none opacity-0 translate-y-2 scale-[0.98]'
+          } ${compact ? 'left-1' : ''}`}
+        >
+          {hoverCard}
+        </div>
+
         <button
           onClick={() => setOpen(true)}
-          data-tv-hide='1'
           title='下载客户端'
           aria-label='下载客户端'
           className={`group inline-flex items-center justify-center gap-2 rounded-lg border border-green-500/70 bg-green-50/40 px-4 py-2 text-sm text-green-600 transition-colors duration-200 min-h-[40px] hover:border-green-600 hover:bg-green-500/10 hover:text-green-700 dark:border-green-400/50 dark:bg-green-400/10 dark:text-green-400 dark:hover:border-green-400 dark:hover:bg-green-400/15 dark:hover:text-green-300 ${
@@ -239,7 +262,7 @@ const DownloadEntry = ({
           {!compact && <span className='whitespace-nowrap'>下载客户端</span>}
         </button>
         {sheet}
-      </>
+      </div>
     );
   }
 

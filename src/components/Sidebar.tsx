@@ -282,11 +282,11 @@ const Sidebar = ({ onToggle, activePath = '/' }: SidebarProps) => {
                   );
                 })}
               </div>
+            </div>
 
-              {/* 下载客户端：放在综艺正下方，居中显示（和顶部 Logo 对齐） */}
-              <div className='mt-3 flex justify-center pb-2'>
-                <DownloadEntry variant='sidebar' compact={isCollapsed} />
-              </div>
+            {/* 下载客户端：固定在侧边栏左下角，悬停弹出下载卡片 */}
+            <div className='shrink-0 px-2 pb-3 pt-2'>
+              <DownloadEntry variant='sidebar' compact={isCollapsed} />
             </div>
           </div>
         </aside>
