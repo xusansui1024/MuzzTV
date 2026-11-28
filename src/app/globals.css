@@ -266,6 +266,27 @@ div[data-media-provider] video {
   grid-template-columns: auto 1fr !important;
 }
 
+/* 电视模式常显播放器控制条：遥控器没有鼠标移动，
+   播放器默认会把控制条淡出隐藏，导致遥控焦点无处可落（全屏/设置选不到） */
+.tv-mode .art-video-player .art-bottom {
+  opacity: 1 !important;
+}
+
+.tv-mode .art-video-player .art-bottom .art-controls,
+.tv-mode .art-video-player .art-bottom .art-progress {
+  transform: translateY(0) !important;
+}
+
+/* 播放器控件获得遥控焦点时的描边（与封面绿框区分，用蓝色细框） */
+.tv-mode .art-video-player [data-tv-control].tv-focused {
+  outline: 3px solid #38bdf8 !important;
+  outline-offset: -3px;
+  border-radius: 0.5rem;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.35) !important;
+  transform: none !important;
+  z-index: 50;
+}
+
 /* 下载入口面板上滑动画 */
 @keyframes slideUp {
   from {

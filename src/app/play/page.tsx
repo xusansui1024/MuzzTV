@@ -182,7 +182,15 @@ function PlayPageClient() {
 
   // 保存优选时的测速结果，避免EpisodeSelector重复测速
   const [precomputedVideoInfo, setPrecomputedVideoInfo] = useState<
-    Map<string, { quality: string; loadSpeed: string; pingTime: number; hasError?: boolean }>
+    Map<
+      string,
+      {
+        quality: string;
+        loadSpeed: string;
+        pingTime: number;
+        hasError?: boolean;
+      }
+    >
   >(new Map());
 
   // 折叠状态（仅在 lg 及以上屏幕有效）
@@ -213,7 +221,7 @@ function PlayPageClient() {
 
   // webOS / 部分智能电视的 web 引擎对 hls.js 的 MSE 兼容性较差，
   // 先探测是否支持 MediaSource 且能播 HLS；不支持时回退原生 video 直链播放。
-  const nativeCanPlayHls = (url: string): boolean => {
+  const nativeCanPlayHls = (_url: string): boolean => {
     try {
       const v = document.createElement('video');
       if (!v.canPlayType) return false;
@@ -235,7 +243,12 @@ function PlayPageClient() {
     const batchSize = Math.ceil(sources.length / 2);
     const allResults: Array<{
       source: SearchResult;
-      testResult: { quality: string; loadSpeed: string; pingTime: number; hasError?: boolean };
+      testResult: {
+        quality: string;
+        loadSpeed: string;
+        pingTime: number;
+        hasError?: boolean;
+      };
     } | null> = [];
 
     for (let start = 0; start < sources.length; start += batchSize) {
@@ -343,7 +356,9 @@ function PlayPageClient() {
     // 大陆用户：360资源（zy360）测速成功时强制优先选它（独立 IP 直连，大陆访问稳定）
     if (isCNUser) {
       const idx = resultsWithScore.findIndex(
-        (r) => r.source.source === 'zy360' && !('hasError' in r.testResult && r.testResult.hasError)
+        (r) =>
+          r.source.source === 'zy360' &&
+          !('hasError' in r.testResult && r.testResult.hasError)
       );
       if (idx > 0) {
         const [picked] = resultsWithScore.splice(idx, 1);
@@ -948,6 +963,10 @@ function PlayPageClient() {
   // ---------------------------------------------------------------------------
   // 处理全局快捷键
   const handleKeyboardShortcuts = (e: KeyboardEvent) => {
+    // 电视模式：方向键 / 确认键统一交给 TvNavigation（移动焦点、操作播放器控件），
+    // 否则同一次按键会既快进又挪焦点，遥控器用起来会"乱跳"
+    if (document.documentElement.classList.contains('tv-mode')) return;
+
     // 忽略输入框中的按键事件
     if (
       (e.target as HTMLElement).tagName === 'INPUT' ||
@@ -1290,58 +1309,58 @@ function PlayPageClient() {
         customType: useNativeHls
           ? undefined
           : {
-          m3u8: function (video: HTMLVideoElement, url: string) {
-            if (!Hls) {
-              console.error('HLS.js 未加载');
-              return;
-            }
-
-            if (video.hls) {
-              video.hls.destroy();
-            }
-            const hls = new Hls({
-              debug: false, // 关闭日志
-              enableWorker: true, // WebWorker 解码，降低主线程压力
-              lowLatencyMode: true, // 开启低延迟 LL-HLS
-
-              /* 缓冲/内存相关 */
-              maxBufferLength: 30, // 前向缓冲最大 30s，过大容易导致高延迟
-              backBufferLength: 30, // 仅保留 30s 已播放内容，避免内存占用
-              maxBufferSize: 60 * 1000 * 1000, // 约 60MB，超出后触发清理
-
-              /* 自定义loader */
-              loader: blockAdEnabledRef.current
-                ? CustomHlsJsLoader
-                : Hls.DefaultConfig.loader,
-            });
-
-            hls.loadSource(url);
-            hls.attachMedia(video);
-            video.hls = hls;
-
-            ensureVideoSource(video, url);
-
-            hls.on(Hls.Events.ERROR, function (event: any, data: any) {
-              console.error('HLS Error:', event, data);
-              if (data.fatal) {
-                switch (data.type) {
-                  case Hls.ErrorTypes.NETWORK_ERROR:
-                    console.log('网络错误，尝试恢复...');
-                    hls.startLoad();
-                    break;
-                  case Hls.ErrorTypes.MEDIA_ERROR:
-                    console.log('媒体错误，尝试恢复...');
-                    hls.recoverMediaError();
-                    break;
-                  default:
-                    console.log('无法恢复的错误');
-                    hls.destroy();
-                    break;
+              m3u8: function (video: HTMLVideoElement, url: string) {
+                if (!Hls) {
+                  console.error('HLS.js 未加载');
+                  return;
                 }
-              }
-            });
-          }
-        },
+
+                if (video.hls) {
+                  video.hls.destroy();
+                }
+                const hls = new Hls({
+                  debug: false, // 关闭日志
+                  enableWorker: true, // WebWorker 解码，降低主线程压力
+                  lowLatencyMode: true, // 开启低延迟 LL-HLS
+
+                  /* 缓冲/内存相关 */
+                  maxBufferLength: 30, // 前向缓冲最大 30s，过大容易导致高延迟
+                  backBufferLength: 30, // 仅保留 30s 已播放内容，避免内存占用
+                  maxBufferSize: 60 * 1000 * 1000, // 约 60MB，超出后触发清理
+
+                  /* 自定义loader */
+                  loader: blockAdEnabledRef.current
+                    ? CustomHlsJsLoader
+                    : Hls.DefaultConfig.loader,
+                });
+
+                hls.loadSource(url);
+                hls.attachMedia(video);
+                video.hls = hls;
+
+                ensureVideoSource(video, url);
+
+                hls.on(Hls.Events.ERROR, function (event: any, data: any) {
+                  console.error('HLS Error:', event, data);
+                  if (data.fatal) {
+                    switch (data.type) {
+                      case Hls.ErrorTypes.NETWORK_ERROR:
+                        console.log('网络错误，尝试恢复...');
+                        hls.startLoad();
+                        break;
+                      case Hls.ErrorTypes.MEDIA_ERROR:
+                        console.log('媒体错误，尝试恢复...');
+                        hls.recoverMediaError();
+                        break;
+                      default:
+                        console.log('无法恢复的错误');
+                        hls.destroy();
+                        break;
+                    }
+                  }
+                });
+              },
+            },
         icons: {
           loading:
             '<img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MCIgaGVpZ2h0PSI1MCIgdmlld0JveD0iMCAwIDUwIDUwIj48cGF0aCBkPSJNMjUuMjUxIDYuNDYxYy0xMC4zMTggMC0xOC42ODMgOC4zNjUtMTguNjgzIDE4LjY4M2g0LjA2OGMwLTguMDcgNi41NDUtMTQuNjE1IDE0LjYxNS0xNC42MTVWNi40NjF6IiBmaWxsPSIjMDA5Njg4Ij48YW5pbWF0ZVRyYW5zZm9ybSBhdHRyaWJ1dGVOYW1lPSJ0cmFuc2Zvcm0iIGF0dHJpYnV0ZVR5cGU9IlhNTCIgZHVyPSIxcyIgZnJvbT0iMCAyNSAyNSIgcmVwZWF0Q291bnQ9ImluZGVmaW5pdGUiIHRvPSIzNjAgMjUgMjUiIHR5cGU9InJvdGF0ZSIvPjwvcGF0aD48L3N2Zz4=">',
