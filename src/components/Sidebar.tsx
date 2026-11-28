@@ -14,6 +14,7 @@ import {
   useState,
 } from 'react';
 
+import DownloadEntry from './DownloadEntry';
 import { useSite } from './SiteProvider';
 
 interface SidebarContextType {
@@ -280,6 +281,11 @@ const Sidebar = ({ onToggle, activePath = '/' }: SidebarProps) => {
                     </Link>
                   );
                 })}
+              </div>
+
+              {/* 下载客户端：放在综艺正下方，居中显示（和顶部 Logo 对齐） */}
+              <div className='mt-3 flex justify-center pb-2'>
+                <DownloadEntry variant='sidebar' compact={isCollapsed} />
               </div>
             </div>
           </div>

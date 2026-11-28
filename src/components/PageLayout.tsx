@@ -1,5 +1,4 @@
 import { BackButton } from './BackButton';
-import DownloadEntry from './DownloadEntry';
 import IpBadge from './IpBadge';
 import MobileBottomNav from './MobileBottomNav';
 import MobileHeader from './MobileHeader';
@@ -34,12 +33,11 @@ const PageLayout = ({ children, activePath = '/' }: PageLayoutProps) => {
             </div>
           )}
 
-          {/* 桌面端顶部按钮 */}
+          {/* 桌面端顶部按钮（下载入口已移到侧边栏综艺下方） */}
           <div
             data-tv-skip='1'
             className='absolute top-2 right-4 z-20 hidden md:flex items-center gap-2'
           >
-            <DownloadEntry />
             <ThemeToggle />
             <UserMenu />
           </div>
