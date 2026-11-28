@@ -93,6 +93,7 @@ export default function ContinueWatching({ className }: ContinueWatchingProps) {
         </h2>
         {!loading && playRecords.length > 0 && (
           <button
+            data-tv-hide='1'
             className='text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
             onClick={async () => {
               await clearAllPlayRecords();

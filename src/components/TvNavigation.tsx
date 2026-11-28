@@ -409,6 +409,42 @@ export default function TvNavigation() {
         }
         cands.push({ el, r });
       }
+
+      // 封面网格的边界约束：
+      // - 任一排最左边那张封面按左，不再"飞"到侧边栏底部的「综艺」，改为回到侧边栏第一项；
+      // - 最上一排按上，不再跳到顶部的主题/账号等工具按钮，原地不动。
+      if (isCard(current) && (dir === 'left' || dir === 'up')) {
+        const gridCands = cands.filter(({ el }) => isCard(el));
+        const rowOverlap = (r: DOMRect) =>
+          Math.max(
+            0,
+            Math.min(curRect.bottom, r.bottom) - Math.max(curRect.top, r.top)
+          );
+        if (dir === 'left') {
+          const sameRow = gridCands.filter(({ r }) => rowOverlap(r) > 0);
+          if (!sameRow.length) {
+            const menu = collect().find((el) => isSidebarEl(el));
+            if (menu) focusEl(menu);
+            return;
+          }
+          cands.length = 0;
+          cands.push(...sameRow);
+        } else {
+          // 向上：只认"同一列"里位置更高的封面，顶部那一排按上就是原地不动，
+          // 不要横向跳到同一行的别的卡片，也别跳到顶部的工具按钮
+          const colOverlap = (r: DOMRect) =>
+            Math.max(
+              0,
+              Math.min(curRect.right, r.right) - Math.max(curRect.left, r.left)
+            );
+          const above = gridCands.filter(
+            ({ r }) => colOverlap(r) > 0 && r.top < curRect.top - 8
+          );
+          if (!above.length) return;
+          cands.length = 0;
+          cands.push(...above);
+        }
+      }
       if (!cands.length) return;
 
       const overlap = (r: DOMRect) =>
