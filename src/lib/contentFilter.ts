@@ -41,6 +41,16 @@ const BLOCKED_KEYWORDS = [
   'uncensored',
 ];
 
+/**
+ * 需要区分上下文的词：
+ * 「色情 / 情色」本身要拦，但《白色情人节》《血色情欲》《桃色情人》这类
+ * 正常片名里也带这两个字，所以只在前一个字不是颜色/氛围字时才拦。
+ */
+const CONTEXT_PATTERNS = [
+  /(?:^|[^白黑蓝血桃粉紫绿黄红灰金银])色情/,
+  /(?:^|[^白黑蓝血桃粉紫绿黄红灰])情色/,
+];
+
 /** 标题里明显属于成人内容的判断（大小写、空格、标点都不影响） */
 export function isBlockedContent(...texts: Array<string | undefined | null>) {
   const blob = texts
@@ -49,6 +59,7 @@ export function isBlockedContent(...texts: Array<string | undefined | null>) {
     .toLowerCase()
     .replace(/[\s._\-·:：!！?？,，、|/\\()（）[\]【】'"“”]/g, '');
   if (!blob) return false;
+  if (CONTEXT_PATTERNS.some((re) => re.test(blob))) return true;
   return BLOCKED_KEYWORDS.some((kw) => {
     const key = kw.toLowerCase().replace(/[\s._\-·:：]/g, '');
     // 英文短词必须整词命中，避免 "jav" 命中 "java"、"xxx" 命中正常编号
@@ -90,6 +101,19 @@ const SUSPICIOUS_WORDS = [
   '裸',
 ];
 
+// 只放在简介里判断的词：标题里出现这些很可能是正常片名（如《白色情人节》里
+// 就含「色情」两个字），但一部正常片的简介不会主动写"色情/情色"，
+// 所以放在简介一侧拦，既挡住成人条目又不误杀情人节系列
+const DESC_ONLY_WORDS = [
+  '色情',
+  '情色',
+  '艳情',
+  'A片',
+  '成人片',
+  '成人影片',
+  '成人内容',
+];
+
 export function isBlockedDescription(
   ...texts: Array<string | undefined | null>
 ) {
@@ -97,6 +121,7 @@ export function isBlockedDescription(
   if (!joined) return false;
   // 明确成人词：简介里出现一个就够
   if (isBlockedContent(joined)) return true;
+  if (DESC_ONLY_WORDS.some((w) => joined.includes(w))) return true;
   // 场景词需要同时命中两个，降低对正常剧情简介的误杀
   const hits = SUSPICIOUS_WORDS.filter((w) => joined.includes(w)).length;
   return hits >= 2;
