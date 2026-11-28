@@ -9,19 +9,20 @@ import { useEffect } from 'react';
  * - 监听 window 捕获阶段（先于任何组件），keydown + keyup 双保险；
  * - 不论焦点停在侧边栏、封面卡片、筛选按钮还是播放器上，都先走这里；
  * - 首层页面（主页 / 电影 / 剧集 / 综艺 / 搜索）一律弹「要退出吗」；
- * - 次层页面（详情 / 播放）保持原有行为：先收抽屉，再回退。
- */
+ * - 次层页面（详情 / 播放）保持原有行为：先收抽屉，再回退。 */
 export default function TvBackGuard() {
   useEffect(() => {
     let lastAt = 0;
 
-    const isTop = () => {
+    // 浏览类页面（首页、电影、剧集、综艺、搜索、收藏夹…）按返回键都直接弹退出确认，
+    // 不再"先退回首页、再按一次才弹"，用户在哪个分区浏览都能一步退出；
+    // 只有详情/播放这类真正需要退回上一层的页面才走 history.back()
+    const isDetailPage = () => {
       const p = window.location.pathname;
       return (
-        p === '/' ||
-        p === '/douban' ||
-        p.startsWith('/douban/') ||
-        p === '/search'
+        p.startsWith('/detail') ||
+        p.startsWith('/play') ||
+        p.startsWith('/admin')
       );
     };
 
@@ -62,6 +63,9 @@ export default function TvBackGuard() {
       );
     };
 
+    const isBackspace = (e: KeyboardEvent) =>
+      e.key === 'Backspace' || e.keyCode === 8;
+
     const handleBack = () => {
       const now = Date.now();
       if (now - lastAt < 400) return;
@@ -77,18 +81,19 @@ export default function TvBackGuard() {
         window.dispatchEvent(new CustomEvent('tv-close-panel'));
         return;
       }
-      if (!isTop()) {
-        if (window.history.length > 1) window.history.back();
-        else window.location.href = '/';
+      if (!isDetailPage()) {
+        window.dispatchEvent(new CustomEvent('tv-exit-request'));
         return;
       }
-      window.dispatchEvent(new CustomEvent('tv-exit-request'));
+      if (window.history.length > 1) window.history.back();
+      else window.location.href = '/';
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (!isBackKey(e) || !inTvMode() || isTyping(e.target as HTMLElement)) {
-        return;
-      }
+      if (!isBackKey(e) || !inTvMode()) return;
+      // 搜索框里输入时，只有 Backspace 让给输入框删字；
+      // 遥控器真正的返回键（Escape / keyCode 4 / 10009 等）照常弹退出确认
+      if (isTyping(e.target as HTMLElement) && isBackspace(e)) return;
       if (e.ctrlKey || e.metaKey) return;
       e.preventDefault();
       e.stopPropagation();
@@ -97,9 +102,8 @@ export default function TvBackGuard() {
 
     // 部分电视/WebView 只在 keyup 阶段派发返回键，这里做一次补捕
     const onKeyUp = (e: KeyboardEvent) => {
-      if (!isBackKey(e) || !inTvMode() || isTyping(e.target as HTMLElement)) {
-        return;
-      }
+      if (!isBackKey(e) || !inTvMode()) return;
+      if (isTyping(e.target as HTMLElement) && isBackspace(e)) return;
       if (e.ctrlKey || e.metaKey) return;
       e.preventDefault();
       e.stopPropagation();
