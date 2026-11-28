@@ -53,7 +53,6 @@ const CLEAN_SOURCES = new Set([
   'bdzy', // 百度资源
   'maoyan', // 猫眼资源
   'lzizy1', // 量子资源2：与量子同 CDN，4 点抽帧无赌博水印
-  'lovedan', // 乐丹资源：聚合站，本片干净（部分片走飘零 CDN 会带跑马灯）
 ]);
 // 含广告：画面烧录水印/跑马灯，或 m3u8 内插播广告分片
 const AD_SOURCES = new Set([

@@ -104,10 +104,6 @@
       "api": "https://lzizy1.com/api.php/provide/vod",
       "name": "量子资源2"
     },
-    "lovedan": {
-      "api": "https://www.lovedan.net/api.php/provide/vod",
-      "name": "乐丹资源"
-    },
     "uku": {
       "api": "https://api.ukuapi88.com/api.php/provide/vod",
       "name": "U酷资源"
