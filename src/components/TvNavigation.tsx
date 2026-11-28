@@ -485,16 +485,55 @@ export default function TvNavigation() {
           cands.length = 0;
           cands.push(...sameRow);
         } else if (dir === 'up') {
-          // 只认"同一列"里位置更高的封面；到顶了就翻页向上，别去碰顶部工具按钮
+          // 只认"同一列"里位置更高的封面；到顶了就找上方的分类/地区/类型筛选胶囊，
+          // 真的没有可聚焦控件才整页上翻，别去碰顶部工具按钮
           const above = gridCands.filter(
             ({ r }) => colOverlap(r) > 0 && r.top < curRect.top - 8
           );
-          if (!above.length) {
+          if (above.length) {
+            cands.length = 0;
+            cands.push(...above);
+          } else {
+            // 上方非封面控件（筛选胶囊等）：只在内容区里找，侧边栏菜单顶部更低，
+            // 不排除的话会从第一张封面直接跳到「剧集」菜单项
+            const sidebarEl = document.querySelector<HTMLElement>(
+              '[data-tv-sidebar], aside[data-sidebar]'
+            );
+            const mainLeft = sidebarEl
+              ? sidebarEl.getBoundingClientRect().right + 4
+              : window.innerWidth * 0.18;
+            const ctrlAbove = cands.filter(
+              ({ el, r }) =>
+                !isCard(el) &&
+                !isSidebarEl(el) &&
+                r.left >= mainLeft &&
+                r.top < curRect.top - 8
+            );
+            if (!ctrlAbove.length) {
+              flipPage('up');
+              return;
+            }
+            const withOv = ctrlAbove.filter(({ r }) => colOverlap(r) > 0);
+            const pool = withOv.length ? withOv : ctrlAbove;
+            // 取"最靠近封面区"的那一排（top 最大），不要跳到页面最顶部的工具条
+            const rowTop = Math.max(...pool.map(({ r }) => r.top));
+            let target: HTMLElement | null = null;
+            let targetScore = Infinity;
+            for (const { el, r } of pool) {
+              const dcx = r.left + r.width / 2 - curCX;
+              const score = Math.abs(r.top - rowTop) * 3 + Math.abs(dcx);
+              if (score < targetScore) {
+                targetScore = score;
+                target = el;
+              }
+            }
+            if (target) {
+              focusEl(target);
+              return;
+            }
             flipPage('up');
             return;
           }
-          cands.length = 0;
-          cands.push(...above);
         } else {
           // 向下：只认真的在下面一行（至少错开半张卡片高度，避免同一行里 1px 的错位被当成下一排）；
           // 已经到了最底一排就翻页往下
