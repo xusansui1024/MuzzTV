@@ -9,9 +9,7 @@
  * 免得把《色，戒》《情书》这种正常电影误杀。
  */
 const BLOCKED_KEYWORDS = [
-  // 中文
-  '色情',
-  '情色片',
+  // 中文：只保留高精度、基本只会出现在成人资源上的词
   '成人影片',
   '成人视频',
   '成人电影',
@@ -20,9 +18,6 @@ const BLOCKED_KEYWORDS = [
   '有码',
   '无修正',
   'av女优',
-  '女优',
-  '裸体',
-  '全裸',
   '性爱',
   '做爱',
   '性交',
@@ -64,4 +59,45 @@ export function isBlockedContent(...texts: Array<string | undefined | null>) {
     }
     return blob.includes(key);
   });
+}
+
+/**
+ * 简介过滤：有些条目标题起得很"干净"，但简介里全是偷拍、洗澡、公寓这类场景词。
+ * 单个词很容易误伤正常剧情片（悬疑片也可能写"公寓""浴室"），
+ * 所以规则是：命中明确成人词 → 直接拦；命中 2 个以上"可疑场景词" → 也拦。
+ */
+const SUSPICIOUS_WORDS = [
+  '偷拍',
+  '偷窥',
+  '裙底',
+  '更衣室',
+  '洗澡',
+  '沐浴',
+  '公寓',
+  '厕所',
+  '床上',
+  '呻吟',
+  '内衣',
+  '私密',
+  '偷情',
+  '开房',
+  '一夜情',
+  '艳照',
+  '桃色',
+  '陪睡',
+  '潜规则',
+  '按摩',
+  '裸',
+];
+
+export function isBlockedDescription(
+  ...texts: Array<string | undefined | null>
+) {
+  const joined = texts.filter(Boolean).join(' ');
+  if (!joined) return false;
+  // 明确成人词：简介里出现一个就够
+  if (isBlockedContent(joined)) return true;
+  // 场景词需要同时命中两个，降低对正常剧情简介的误杀
+  const hits = SUSPICIOUS_WORDS.filter((w) => joined.includes(w)).length;
+  return hits >= 2;
 }

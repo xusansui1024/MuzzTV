@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { getAvailableApiSites, getCacheTime } from '@/lib/config';
-import { isBlockedContent } from '@/lib/contentFilter';
+import { isBlockedContent, isBlockedDescription } from '@/lib/contentFilter';
 import { getDetailFromApi } from '@/lib/downstream';
 
 export const runtime = 'edge';
@@ -29,7 +29,10 @@ export async function GET(request: Request) {
 
     const result = await getDetailFromApi(apiSite, id);
     // 详情页也要拦：直接拿 id 拼链接进来的成人条目同样不放行
-    if (isBlockedContent(result?.title, result?.type_name)) {
+    if (
+      isBlockedContent(result?.title, result?.type_name, result?.class) ||
+      isBlockedDescription(result?.desc, result?.class)
+    ) {
       return NextResponse.json({ error: '内容不可用' }, { status: 404 });
     }
     const cacheTime = await getCacheTime();

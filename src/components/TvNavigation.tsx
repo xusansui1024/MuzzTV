@@ -103,6 +103,17 @@ export default function TvNavigation() {
       return false;
     };
 
+    // 首层浏览页（没有"再上一层"的页面）：主页、分类页、搜索页
+    const isTopLevelPage = () => {
+      const p = window.location.pathname;
+      return (
+        p === '/' ||
+        p === '/douban' ||
+        p.startsWith('/douban/') ||
+        p === '/search'
+      );
+    };
+
     const focusEl = (el: HTMLElement) => {
       if (currentRef.current && currentRef.current !== el) {
         currentRef.current.classList.remove('tv-focused');
@@ -140,8 +151,19 @@ export default function TvNavigation() {
       const els = collect().filter((el) => el !== cur);
       const curRect = cur.getBoundingClientRect();
       const curCY = curRect.top + curRect.height / 2;
-      const inMain = (el: HTMLElement) =>
-        el.getBoundingClientRect().left >= window.innerWidth * 0.22;
+      // 内容区的左边界用真实侧边栏宽度算，不要用视口百分比：
+      // 1920 宽的电视上 22% 是 422px，第一张封面在 389px 就被判成"不在内容区"，
+      // 于是直接漏掉第一个影片，落到第二张——这正是"右键跳第二个"的元凶
+      const sidebar = document.querySelector<HTMLElement>(
+        '[data-tv-sidebar], aside[data-sidebar]'
+      );
+      const mainLeft = sidebar
+        ? sidebar.getBoundingClientRect().right + 4
+        : window.innerWidth * 0.18;
+      const inMain = (el: HTMLElement) => {
+        const r = el.getBoundingClientRect();
+        return r.left + 4 >= mainLeft && r.right > mainLeft;
+      };
 
       const pick = (list: HTMLElement[]) => {
         let best: HTMLElement | null = null;
@@ -512,8 +534,9 @@ export default function TvNavigation() {
         } else if (document.querySelector('.tv-panel.tv-open')) {
           // 选集/换源抽屉开着时，返回键只收起抽屉，不能直接退出观影页
           window.dispatchEvent(new CustomEvent('tv-close-panel'));
-        } else if (window.location.pathname === '/') {
-          // 主页按返回 = 问一句"退出还是取消"，不再一级级回退历史
+        } else if (isTopLevelPage()) {
+          // 首层页面（主页 / 电影 / 剧集 / 综艺 / 搜索）按返回 = 问一句"退出还是取消"，
+          // 不再一级级回退历史
           window.dispatchEvent(new CustomEvent('tv-exit-request'));
         } else if (window.history.length > 1) {
           window.history.back();
